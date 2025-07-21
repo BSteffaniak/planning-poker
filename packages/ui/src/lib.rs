@@ -129,6 +129,10 @@ pub fn home_page() -> Containers {
                         span { "Game Name:" }
                         input type="text" name="name" placeholder="Enter game name" margin-left=10 required;
                     }
+                    div margin-bottom=10 {
+                        span { "Voting System:" }
+                        input type="text" name="voting_system" value="fibonacci" placeholder="fibonacci, tshirt, or powers_of_2" margin-left=10 required;
+                    }
                     button type="submit" margin-top=10 padding=10 background="#28a745" color="#fff" border="none" border-radius=5 {
                         "Create Game"
                     }

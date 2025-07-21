@@ -7,6 +7,7 @@ pub struct Game {
     pub id: Uuid,
     pub name: String,
     pub owner_id: Uuid,
+    pub voting_system: String,
     pub state: GameState,
     pub current_story: Option<String>,
     pub created_at: DateTime<Utc>,

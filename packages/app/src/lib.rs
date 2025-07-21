@@ -76,8 +76,15 @@ pub struct JoinGameForm {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct CreateGameForm {
+    pub name: String,
+    pub voting_system: String,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct CreateGameRequest {
     pub name: String,
+    pub voting_system: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -211,13 +218,26 @@ pub async fn create_game_route(
         return Err(RouteError::UnsupportedMethod);
     }
 
-    let body = req.body.as_ref().ok_or(RouteError::MissingFormData)?;
-    let create_request: CreateGameRequest = serde_json::from_slice(body)
-        .map_err(|e| RouteError::ParseBody(ParseError::SerdeJson(e)))?;
+    let form_data = req.parse_form::<CreateGameForm>()?;
+
+    // Validate form data
+    if form_data.name.trim().is_empty() {
+        return Err(RouteError::RouteFailed("Game name is required".to_string()));
+    }
+
+    if form_data.voting_system.trim().is_empty() {
+        return Err(RouteError::RouteFailed(
+            "Voting system is required".to_string(),
+        ));
+    }
     let owner_id = Uuid::new_v4(); // TODO: Get from authentication
 
     match session_manager
-        .create_game(create_request.name, owner_id)
+        .create_game(
+            form_data.name.clone(),
+            form_data.voting_system.clone(),
+            owner_id,
+        )
         .await
     {
         Ok(game) => {
@@ -517,5 +537,16 @@ mod tests {
 
         assert_eq!(form_data.game_id, "550e8400-e29b-41d4-a716-446655440000");
         assert_eq!(form_data.player_name, "Test Player");
+    }
+
+    #[test]
+    fn test_create_game_form_deserialization() {
+        let form_data = CreateGameForm {
+            name: "Test Game".to_string(),
+            voting_system: "fibonacci".to_string(),
+        };
+
+        assert_eq!(form_data.name, "Test Game");
+        assert_eq!(form_data.voting_system, "fibonacci");
     }
 }

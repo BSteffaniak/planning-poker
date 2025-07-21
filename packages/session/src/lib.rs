@@ -7,7 +7,12 @@ use uuid::Uuid;
 
 #[async_trait]
 pub trait SessionManager: Send + Sync {
-    async fn create_game(&self, name: String, owner_id: Uuid) -> Result<Game>;
+    async fn create_game(
+        &self,
+        name: String,
+        voting_system: String,
+        owner_id: Uuid,
+    ) -> Result<Game>;
     async fn get_game(&self, game_id: Uuid) -> Result<Option<Game>>;
     async fn update_game(&self, game: &Game) -> Result<()>;
     async fn delete_game(&self, game_id: Uuid) -> Result<()>;
@@ -40,11 +45,17 @@ impl DatabaseSessionManager {
 
 #[async_trait]
 impl SessionManager for DatabaseSessionManager {
-    async fn create_game(&self, name: String, owner_id: Uuid) -> Result<Game> {
+    async fn create_game(
+        &self,
+        name: String,
+        voting_system: String,
+        owner_id: Uuid,
+    ) -> Result<Game> {
         let game = Game {
             id: Uuid::new_v4(),
             name,
             owner_id,
+            voting_system,
             state: planning_poker_models::GameState::Waiting,
             current_story: None,
             created_at: Utc::now(),

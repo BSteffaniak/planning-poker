@@ -22,7 +22,7 @@ async fn create_game(
     let owner_id = Uuid::new_v4();
 
     match session_manager
-        .create_game(req.name.clone(), owner_id)
+        .create_game(req.name.clone(), req.voting_system.clone(), owner_id)
         .await
     {
         Ok(game) => Ok(HttpResponse::Ok().json(CreateGameResponse { game })),
