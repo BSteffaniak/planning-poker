@@ -1,76 +1,36 @@
 use anyhow::Result;
-use clap::Parser;
-use planning_poker_ui::PlanningPokerApp;
+use hyperchad::app::AppBuilder;
+use std::sync::Arc;
 use tracing::{info, Level};
 
-#[derive(Parser)]
-#[command(name = "planning-poker-app")]
-#[command(about = "Planning Poker Cross-Platform Application")]
-struct Args {
-    #[arg(short, long, default_value = "desktop")]
-    renderer: String,
-
-    #[arg(short, long, default_value = "ws://localhost:8080/api/v1/ws")]
-    server_url: String,
-}
-
-#[tokio::main]
-async fn main() -> Result<()> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize tracing
     tracing_subscriber::fmt().with_max_level(Level::INFO).init();
 
-    let args = Args::parse();
-
     info!("Starting Planning Poker App");
-    info!("Renderer: {}", args.renderer);
-    info!("Server URL: {}", args.server_url);
 
-    let app = PlanningPokerApp::new(args.server_url);
+    // Create runtime like MoosicBox does
+    let runtime = switchy::unsync::runtime::Builder::new()
+        .max_blocking_threads(64)
+        .build()
+        .unwrap();
 
-    match args.renderer.as_str() {
-        #[cfg(feature = "desktop")]
-        "desktop" => {
-            info!("Starting desktop app with egui renderer");
-            run_desktop_app(app).await?;
-        }
-        #[cfg(feature = "web")]
-        "web" => {
-            info!("Starting web app with HTML renderer");
-            run_web_app(app).await?;
-        }
-        _ => {
-            eprintln!("Unknown renderer: {}", args.renderer);
-            eprintln!("Available renderers: desktop, web");
-            std::process::exit(1);
-        }
-    }
+    let runtime = Arc::new(runtime);
 
-    Ok(())
-}
+    // Create router with planning poker routes
+    let router = planning_poker_ui::create_router();
 
-#[cfg(feature = "desktop")]
-async fn run_desktop_app(app: PlanningPokerApp) -> Result<()> {
-    use eframe::egui;
+    // Build hyperchad app with runtime handle - following MoosicBox pattern
+    let app = AppBuilder::new()
+        .with_title("Planning Poker".to_string())
+        .with_description("A planning poker application".to_string())
+        .with_router(router)
+        .with_runtime_handle(runtime.handle().clone())
+        .with_size(800.0, 600.0)
+        .build_default()?;
 
-    let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            .with_inner_size([800.0, 600.0])
-            .with_title("Planning Poker"),
-        ..Default::default()
-    };
+    info!("Running hyperchad app with built-in CLI");
+    app.run()?;
 
-    if let Err(e) = eframe::run_native("Planning Poker", options, Box::new(|_cc| Ok(Box::new(app))))
-    {
-        eprintln!("Failed to run desktop app: {e}");
-        std::process::exit(1);
-    }
-
-    Ok(())
-}
-
-#[cfg(feature = "web")]
-async fn run_web_app(_app: PlanningPokerApp) -> Result<()> {
-    // TODO: Implement web app using hyperchad HTML renderer
-    info!("Web app not yet implemented");
     Ok(())
 }

@@ -12,27 +12,48 @@ name = "planning-poker-app"
 path = "src/main.rs"
 
 [dependencies]
-planning_poker_models = { workspace = true }
-planning_poker_ui = { workspace = true }
-hyperchad = { workspace = true }
-hyperchad_app = { workspace = true }
-hyperchad_renderer = { workspace = true }
-hyperchad_renderer_egui = { workspace = true, optional = true }
-hyperchad_renderer_html = { workspace = true, optional = true }
-hyperchad_renderer_html_actix = { workspace = true, optional = true }
-hyperchad_state = { workspace = true }
-hyperchad_router = { workspace = true }
 anyhow = { workspace = true }
-clap = { workspace = true }
 eframe = { workspace = true, optional = true }
 egui = { workspace = true, optional = true }
+hyperchad = { workspace = true, features = [
+    "app",
+    "renderer",
+    "router",
+    "state",
+] }
+planning_poker_models = { workspace = true }
+planning_poker_ui = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-tokio = { workspace = true, features = ["full"] }
-tracing = { workspace = true }
+switchy = { workspace = true, features = [
+    "async-macros",
+    "async-net",
+    "async-rt-multi-thread",
+    "async-sync",
+    "async-time",
+    "async-tokio",
+    "async-util",
+] }
+
+tracing            = { workspace = true }
 tracing-subscriber = { workspace = true }
 
 [features]
 default = ["desktop"]
-desktop = ["dep:hyperchad_renderer_egui", "dep:eframe", "dep:egui", "planning_poker_ui/desktop"]
-web = ["dep:hyperchad_renderer_html", "dep:hyperchad_renderer_html_actix"]
+desktop = [
+    "dep:eframe",
+    "dep:egui",
+    "hyperchad/renderer-egui",
+    "planning_poker_ui/desktop",
+]
+vanilla-js = [
+    "hyperchad/renderer-vanilla-js",
+    "hyperchad/renderer-vanilla-js-plugin-actions",
+    "hyperchad/renderer-vanilla-js-plugin-canvas",
+    "hyperchad/renderer-vanilla-js-plugin-event",
+    "hyperchad/renderer-vanilla-js-plugin-form",
+    "hyperchad/renderer-vanilla-js-plugin-routing",
+    "web",
+]
+web = ["hyperchad/renderer-html", "hyperchad/renderer-html-actix"]
+

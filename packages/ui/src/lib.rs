@@ -1,4 +1,9 @@
 use anyhow::Result;
+use hyperchad::{
+    renderer::View,
+    router::{RouteRequest, Router},
+    template::{self as hyperchad_template, container, Containers},
+};
 use planning_poker_models::{GameState, ServerMessage};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -201,145 +206,43 @@ impl PlanningPokerApp {
     }
 }
 
-// Implement egui App trait for desktop rendering
-#[cfg(feature = "desktop")]
-impl eframe::App for PlanningPokerApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        egui::CentralPanel::default().show(ctx, |ui| {
-            ui.heading("Planning Poker");
+pub fn create_router() -> Router {
+    Router::new().with_route_result("/", |_request: RouteRequest| {
+        let content = home_page();
+        // Convert Vec<Container> to single Container by taking the first one
+        let container = content.into_iter().next().unwrap_or_default();
+        async move {
+            Ok::<View, anyhow::Error>(View {
+                immediate: container,
+                future: None,
+            })
+        }
+    })
+}
 
-            if !self.state.connected {
-                ui.label("Not connected to server");
-                if ui.button("Connect").clicked() {
-                    if let Err(e) = self.connect_to_server() {
-                        self.state.error_message = Some(format!("Connection failed: {e}"));
+#[must_use]
+pub fn home_page() -> Containers {
+    container! {
+        div width=100% height=100% padding=20 {
+            h1 { "Planning Poker" }
+            div { "Welcome to Planning Poker!" }
+
+            div margin-top=20 {
+                h2 { "Join a Game" }
+                form {
+                    div margin-bottom=10 {
+                        span { "Game ID:" }
+                        input type="text" name="game-id" placeholder="Enter game ID" margin-left=10;
                     }
-                }
-            } else {
-                ui.label("Connected to server");
-
-                if let Some(ref game) = self.state.current_game {
-                    ui.separator();
-                    ui.heading(&game.name);
-
-                    if let Some(ref story) = game.current_story {
-                        ui.label(format!("Current story: {story}"));
+                    div margin-bottom=10 {
+                        span { "Your Name:" }
+                        input type="text" name="player-name" placeholder="Enter your name" margin-left=10;
                     }
-
-                    match game.state {
-                        GameState::Waiting => {
-                            ui.label("Waiting for voting to start...");
-
-                            if self.is_game_owner() {
-                                ui.separator();
-                                ui.label("Game Owner Controls:");
-
-                                ui.text_edit_singleline(&mut self.state.story_input);
-                                if ui.button("Start Voting").clicked() {
-                                    if let Err(e) =
-                                        self.start_voting(self.state.story_input.clone())
-                                    {
-                                        self.state.error_message =
-                                            Some(format!("Failed to start voting: {e}"));
-                                    }
-                                }
-                            }
-                        }
-                        GameState::Voting => {
-                            ui.label("Voting in progress...");
-
-                            if self.state.my_vote.is_none() {
-                                ui.separator();
-                                ui.label("Cast your vote:");
-
-                                ui.horizontal_wrapped(|ui| {
-                                    for option in self.get_voting_options() {
-                                        if ui.button(&option).clicked() {
-                                            if let Err(e) = self.cast_vote(option) {
-                                                self.state.error_message =
-                                                    Some(format!("Failed to cast vote: {e}"));
-                                            }
-                                        }
-                                    }
-                                });
-                            } else {
-                                ui.label(format!(
-                                    "You voted: {}",
-                                    self.state.my_vote.as_ref().unwrap()
-                                ));
-                            }
-
-                            if self.is_game_owner() {
-                                ui.separator();
-                                if ui.button("Reveal Votes").clicked() {
-                                    if let Err(e) = self.reveal_votes() {
-                                        self.state.error_message =
-                                            Some(format!("Failed to reveal votes: {e}"));
-                                    }
-                                }
-                            }
-                        }
-                        GameState::Revealed => {
-                            ui.label("Votes revealed!");
-
-                            ui.separator();
-                            for player in &self.state.players {
-                                if let Some(vote) = self.state.votes.get(&player.id) {
-                                    ui.label(format!("{}: {}", player.name, vote.value));
-                                } else {
-                                    ui.label(format!("{}: (no vote)", player.name));
-                                }
-                            }
-
-                            if self.is_game_owner() {
-                                ui.separator();
-                                if ui.button("Reset Voting").clicked() {
-                                    if let Err(e) = self.reset_voting() {
-                                        self.state.error_message =
-                                            Some(format!("Failed to reset voting: {e}"));
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    ui.separator();
-                    ui.label("Players:");
-                    for player in &self.state.players {
-                        ui.label(&player.name);
-                    }
-                } else {
-                    ui.label("Not in a game");
-
-                    ui.separator();
-                    ui.label("Game ID:");
-                    ui.text_edit_singleline(&mut self.state.game_id_input);
-
-                    ui.label("Your name:");
-                    ui.text_edit_singleline(&mut self.state.player_name_input);
-
-                    if ui.button("Join Game").clicked() {
-                        if let Ok(game_id) = Uuid::parse_str(&self.state.game_id_input) {
-                            if let Err(e) =
-                                self.join_game(game_id, self.state.player_name_input.clone())
-                            {
-                                self.state.error_message =
-                                    Some(format!("Failed to join game: {e}"));
-                            }
-                        } else {
-                            self.state.error_message = Some("Invalid game ID".to_string());
-                        }
+                    button type="submit" margin-top=10 padding=10 background="#007bff" color="#fff" border="none" border-radius=5 {
+                        "Join Game"
                     }
                 }
             }
-
-            if let Some(ref error) = self.state.error_message {
-                ui.separator();
-                ui.colored_label(egui::Color32::RED, format!("Error: {error}"));
-                if ui.button("Clear Error").clicked() {
-                    self.state.error_message = None;
-                }
-            }
-        });
+        }
     }
 }
