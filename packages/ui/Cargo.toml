@@ -9,7 +9,7 @@ version     = "0.1.0"
 
 [dependencies]
 planning_poker_models = { workspace = true }
-hyperchad = { workspace = true, features = ["app", "state", "template", "transformer", "color"] }
+hyperchad = { workspace = true, features = ["app", "state", "template", "transformer", "color", "router", "renderer"] }
 anyhow = { workspace = true }
 eframe = { workspace = true, optional = true }
 egui = { workspace = true, optional = true }

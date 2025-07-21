@@ -8,14 +8,13 @@ repository  = { workspace = true }
 version     = "0.1.0"
 
 [dependencies]
-switchy_database = { workspace = true }
-switchy_database_connection = { workspace = true }
-anyhow = { workspace = true }
+anyhow    = { workspace = true }
+switchy   = { workspace = true, features = ["database", "database-connection"] }
 thiserror = { workspace = true }
-tracing = { workspace = true }
-url = { workspace = true, optional = true }
+tracing   = { workspace = true }
+url       = { workspace = true, optional = true }
 
 [features]
-default = ["sqlite"]
-sqlite = ["switchy_database_connection/sqlite-rusqlite"]
-postgres = ["switchy_database_connection/postgres", "dep:url"]
+default  = ["sqlite"]
+postgres = ["dep:url", "switchy/database-connection-postgres"]
+sqlite   = ["switchy/database-connection-sqlite-rusqlite"]

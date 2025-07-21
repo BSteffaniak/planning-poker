@@ -1,7 +1,7 @@
 use anyhow::Result;
 use std::path::Path;
-pub use switchy_database::Database;
-use switchy_database_connection::{init, InitDbError};
+pub use switchy::database::Database;
+use switchy::database_connection::{init, InitDbError};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -11,7 +11,7 @@ pub enum DatabaseError {
     #[error("Initialization error: {0}")]
     Init(#[from] InitDbError),
     #[error("Database error: {0}")]
-    Database(#[from] switchy_database::DatabaseError),
+    Database(#[from] switchy::database::DatabaseError),
 }
 
 pub struct DatabaseConfig {
@@ -30,7 +30,7 @@ impl Default for DatabaseConfig {
     }
 }
 
-/// Create a database connection using switchy_database
+/// Create a database connection using switchy::database
 pub async fn create_connection(config: DatabaseConfig) -> Result<Box<dyn Database>, DatabaseError> {
     tracing::info!(
         "Creating database connection with URL: {}",
@@ -88,7 +88,7 @@ pub async fn create_connection(config: DatabaseConfig) -> Result<Box<dyn Databas
 
             let password = url.password().map(|p| p.to_string());
 
-            let creds = switchy_database_connection::Credentials::new(
+            let creds = switchy::database_connection::Credentials::new(
                 host,
                 database_name,
                 username,
@@ -111,8 +111,8 @@ pub async fn create_connection(config: DatabaseConfig) -> Result<Box<dyn Databas
     }
 }
 
-// Re-export switchy_database types for convenience
-pub use switchy_database::{
+// Re-export switchy::database types for convenience
+pub use switchy::database::{
     query::{DeleteStatement, InsertStatement, SelectQuery, UpdateStatement, UpsertStatement},
     DatabaseValue, Row, TryFromDb, TryFromError,
 };

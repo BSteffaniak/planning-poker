@@ -1,15 +1,12 @@
 [workspace]
 members = [
-    "packages/api",
     "packages/app",
     "packages/config",
     "packages/database",
     "packages/models",
     "packages/poker",
-    "packages/server",
     "packages/session",
     "packages/ui",
-    "packages/websocket",
 ]
 
 resolver = "2"
@@ -55,36 +52,27 @@ repository = "https://github.com/planning-poker/planning-poker"
 
 [workspace.dependencies]
 # Internal Planning Poker packages
-planning_poker_api       = { version = "0.1.0", default-features = false, path = "packages/api" }
-planning_poker_app       = { version = "0.1.0", default-features = false, path = "packages/app" }
-planning_poker_config    = { version = "0.1.0", default-features = false, path = "packages/config" }
-planning_poker_database  = { version = "0.1.0", default-features = false, path = "packages/database" }
-planning_poker_models    = { version = "0.1.0", default-features = false, path = "packages/models" }
-planning_poker_poker     = { version = "0.1.0", default-features = false, path = "packages/poker" }
-planning_poker_server    = { version = "0.1.0", default-features = false, path = "packages/server" }
-planning_poker_session   = { version = "0.1.0", default-features = false, path = "packages/session" }
-planning_poker_ui        = { version = "0.1.0", default-features = false, path = "packages/ui" }
-planning_poker_websocket = { version = "0.1.0", default-features = false, path = "packages/websocket" }
+planning_poker_app      = { version = "0.1.0", default-features = false, path = "packages/app" }
+planning_poker_config   = { version = "0.1.0", default-features = false, path = "packages/config" }
+planning_poker_database = { version = "0.1.0", default-features = false, path = "packages/database" }
+planning_poker_models   = { version = "0.1.0", default-features = false, path = "packages/models" }
+planning_poker_poker    = { version = "0.1.0", default-features = false, path = "packages/poker" }
+planning_poker_session  = { version = "0.1.0", default-features = false, path = "packages/session" }
+planning_poker_ui       = { version = "0.1.0", default-features = false, path = "packages/ui" }
 
 # External dependencies from MoosicBox workspace
 # HyperChad UI Framework
 hyperchad = { version = "0.1.0", default-features = false, path = "../MoosicBox/packages/hyperchad" }
-hyperchad_color = { version = "0.1.0", default-features = false, path = "../MoosicBox/packages/hyperchad/color" }
-hyperchad_template = { version = "0.1.0", default-features = false, path = "../MoosicBox/packages/hyperchad/template" }
-hyperchad_transformer = { version = "0.1.0", default-features = false, path = "../MoosicBox/packages/hyperchad/transformer" }
-
-# Switchy Database Framework
-switchy_database            = { version = "0.1.3", default-features = false, path = "../MoosicBox/packages/database" }
-switchy_database_connection = { version = "0.1.3", default-features = false, path = "../MoosicBox/packages/database_connection" }
 
 # Switchy Runtime
 switchy = { version = "0.1.4", default-features = false, path = "../MoosicBox/packages/switchy" }
 
 # Common dependencies
 actix-web = "4.11.0"
-actix-ws = "0.3.0"
+
 anyhow = "1.0.98"
 async-trait = "0.1.88"
+bytes = "1.0"
 chrono = { version = "0.4.41", default-features = false, features = [
     "clock",
     "serde",
@@ -94,22 +82,12 @@ eframe = { version = "0.32.0", default-features = false }
 egui = { version = "0.32.0", default-features = false }
 futures = "0.3"
 log = { version = "0.4", features = ["release_max_level_trace"] }
-rusqlite = { version = "=0.32.1", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1.0.141"
-sqlx = { version = "0.8.6", default-features = false, features = [
-    "chrono",
-    "runtime-tokio",
-] }
-sqlx-postgres = { version = "0.8.6", default-features = false, features = [
-    "chrono",
-] }
 thiserror = "2.0.12"
 tokio = { version = "1.46.1" }
-tokio-tungstenite = { version = "0.27.0", features = [
-    "rustls-tls-webpki-roots",
-] }
-tracing = "0.1.41"
+
+tracing            = "0.1.41"
 tracing-subscriber = "0.3.19"
-url = "2.5.4"
-uuid = { version = "1.17.0", features = ["serde", "v4"] }
+url                = "2.5.4"
+uuid               = { version = "1.17.0", features = ["serde", "v4"] }

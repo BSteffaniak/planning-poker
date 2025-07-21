@@ -13,15 +13,26 @@ path = "src/main.rs"
 
 [dependencies]
 anyhow = { workspace = true }
+chrono = { workspace = true }
 eframe = { workspace = true, optional = true }
 egui = { workspace = true, optional = true }
 hyperchad = { workspace = true, features = [
+    "actions",
+    "actions-logic",
     "app",
+    "color",
     "renderer",
     "router",
+    "router-form",
+    "router-serde",
     "state",
+    "template",
+    "transformer",
 ] }
+planning_poker_config = { workspace = true }
+planning_poker_database = { workspace = true }
 planning_poker_models = { workspace = true }
+planning_poker_session = { workspace = true }
 planning_poker_ui = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -34,9 +45,16 @@ switchy = { workspace = true, features = [
     "async-tokio",
     "async-util",
 ] }
-
-tracing            = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+uuid = { workspace = true }
+
+[dependencies.bytes]
+workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt"] }
 
 [features]
 default = ["desktop"]
@@ -53,7 +71,24 @@ vanilla-js = [
     "hyperchad/renderer-vanilla-js-plugin-event",
     "hyperchad/renderer-vanilla-js-plugin-form",
     "hyperchad/renderer-vanilla-js-plugin-routing",
+    "hyperchad/renderer-vanilla-js-plugin-sse",
     "web",
 ]
 web = ["hyperchad/renderer-html", "hyperchad/renderer-html-actix"]
 
+postgres = ["planning_poker_database/postgres"]
+sqlite   = ["planning_poker_database/sqlite"]
+
+_sse = [
+    "hyperchad/renderer-html-sse",
+    "hyperchad/renderer-vanilla-js-plugin-sse",
+]
+
+actix  = ["_sse", "hyperchad/renderer-html-actix"]
+lambda = ["_sse", "hyperchad/renderer-html-lambda"]
+
+assets        = ["hyperchad/renderer-assets"]
+insecure      = ["hyperchad/renderer-vanilla-js-plugin-uuid-insecure"]
+static-routes = ["hyperchad/router-static-routes"]
+
+dev = ["assets", "insecure", "static-routes"]
