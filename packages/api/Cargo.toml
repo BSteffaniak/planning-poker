@@ -1,0 +1,22 @@
+[package]
+authors     = { workspace = true }
+description = "REST API endpoints for planning poker"
+edition     = { workspace = true }
+license     = { workspace = true }
+name        = "planning_poker_api"
+repository  = { workspace = true }
+version     = "0.1.0"
+
+[dependencies]
+planning_poker_models = { workspace = true }
+planning_poker_session = { workspace = true }
+planning_poker_websocket = { workspace = true }
+actix-web = { workspace = true }
+actix-ws = { workspace = true }
+anyhow = { workspace = true }
+futures = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }

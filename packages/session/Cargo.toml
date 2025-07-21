@@ -1,0 +1,20 @@
+[package]
+authors     = { workspace = true }
+description = "Session management and persistence"
+edition     = { workspace = true }
+license     = { workspace = true }
+name        = "planning_poker_session"
+repository  = { workspace = true }
+version     = "0.1.0"
+
+[dependencies]
+planning_poker_models = { workspace = true }
+planning_poker_database = { workspace = true }
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+chrono = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }

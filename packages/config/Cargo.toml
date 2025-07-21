@@ -1,0 +1,14 @@
+[package]
+authors     = { workspace = true }
+description = "Configuration management for planning poker"
+edition     = { workspace = true }
+license     = { workspace = true }
+name        = "planning_poker_config"
+repository  = { workspace = true }
+version     = "0.1.0"
+
+[dependencies]
+anyhow = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+toml = "0.9.2"

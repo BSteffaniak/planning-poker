@@ -1,0 +1,27 @@
+[package]
+authors     = { workspace = true }
+description = "Shared UI components for planning poker"
+edition     = { workspace = true }
+license     = { workspace = true }
+name        = "planning_poker_ui"
+repository  = { workspace = true }
+version     = "0.1.0"
+
+[dependencies]
+planning_poker_models = { workspace = true }
+hyperchad = { workspace = true }
+hyperchad_app = { workspace = true }
+hyperchad_state = { workspace = true }
+hyperchad_template = { workspace = true }
+anyhow = { workspace = true }
+eframe = { workspace = true, optional = true }
+egui = { workspace = true, optional = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+
+[features]
+default = []
+desktop = ["dep:eframe", "dep:egui"]

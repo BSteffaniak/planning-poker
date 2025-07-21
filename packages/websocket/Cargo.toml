@@ -1,0 +1,23 @@
+[package]
+authors     = { workspace = true }
+description = "WebSocket communication layer"
+edition     = { workspace = true }
+license     = { workspace = true }
+name        = "planning_poker_websocket"
+repository  = { workspace = true }
+version     = "0.1.0"
+
+[dependencies]
+planning_poker_models = { workspace = true }
+planning_poker_session = { workspace = true }
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+chrono = { workspace = true }
+futures = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tokio-tungstenite = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
