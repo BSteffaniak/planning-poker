@@ -20,9 +20,14 @@ cargo test --workspace --all-features                         # Run all tests
 cargo test -p planning_poker_models                           # Run single package tests
 cargo fmt --all                                               # Format code
 cargo clippy --workspace --all-targets --all-features -- -D warnings  # Lint
-cargo run --bin planning-poker-server                         # Start server
-cargo run --bin planning-poker-app --features desktop         # Start desktop app
 ```
+
+## Server/App Runtime Restrictions
+
+- **DO NOT run server commands**: Never execute `cargo run --bin planning-poker-server` or `cargo run --bin planning-poker-app`
+- **Interactive processes hang**: These commands start interactive/infinite runtime processes that will hang the agent
+- **Build/test only**: Only use build, test, format, and lint commands - never attempt to serve the application
+- **Verification approach**: Use `cargo build` to verify the server/app compiles correctly
 
 ## Code Style
 
