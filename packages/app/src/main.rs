@@ -1,5 +1,6 @@
 use anyhow::Result;
 use hyperchad::app::AppBuilder;
+use planning_poker_app::set_renderer;
 use planning_poker_config::Config;
 use planning_poker_database::{create_connection, DatabaseConfig};
 use planning_poker_session::DatabaseSessionManager;
@@ -64,6 +65,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let app = app_builder.build_default()?;
+
+    let renderer = Arc::new(app.renderer.clone());
+    info!("Setting renderer");
+    set_renderer(renderer);
+    info!("Renderer set successfully");
 
     info!("Running hyperchad app with built-in CLI");
     app.run()?;

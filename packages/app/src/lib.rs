@@ -1,7 +1,7 @@
 use anyhow::Result;
 use chrono::Utc;
 use hyperchad::{
-    renderer::Content,
+    renderer::{Content, PartialView, Renderer},
     router::{ParseError, RouteRequest, Router},
     template::{self as hyperchad_template, container, Containers},
     transformer::html::ParseError as HtmlParseError,
@@ -9,9 +9,11 @@ use hyperchad::{
 use planning_poker_models::{GameState, Player, Vote};
 use planning_poker_session::SessionManager;
 use serde::Deserialize;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use switchy::http::models::Method;
 use uuid::Uuid;
+
+static RENDERER: OnceLock<Arc<dyn Renderer>> = OnceLock::new();
 
 #[cfg(feature = "assets")]
 pub mod assets {
@@ -104,17 +106,28 @@ pub struct VoteForm {
 }
 
 // SSE Partial Update Helper Functions
-async fn send_partial_update(target: &str, _content: Containers) {
-    // TODO: Implement actual SSE broadcasting
-    // For now, this is a placeholder that would send via SSE channel
-    tracing::info!("SSE Update: target={}, content rendered", target);
+async fn send_partial_update(target: &str, content: Containers) {
+    let Some(renderer) = RENDERER.get() else {
+        tracing::warn!("RENDERER not initialized, cannot send partial update");
+        return;
+    };
 
-    // In a real implementation, this would:
-    // let partial = PartialView {
-    //     target: target.to_string(),
-    //     content: Content::try_view(content).unwrap(),
-    // };
-    // sse_sender.send(RendererEvent::Partial(partial)).await;
+    tracing::info!(
+        "Sending partial update to target: {} with content length: {}",
+        target,
+        format!("{content:?}").len()
+    );
+
+    let partial = PartialView {
+        target: target.to_string(),
+        container: content.into(),
+    };
+
+    if let Err(e) = renderer.render_partial(partial).await {
+        tracing::error!("Failed to render_partial for target {}: {e:?}", target);
+    } else {
+        tracing::info!("Successfully sent partial update to target: {}", target);
+    }
 }
 
 async fn update_game_status(_game_id: &str, status: &str) {
@@ -129,13 +142,16 @@ async fn update_game_status(_game_id: &str, status: &str) {
 
 async fn update_players_list(_game_id: &str, players: Vec<Player>) {
     let content = container! {
-        div {
+        @if players.is_empty() {
+            div color="#666" { "No players yet" }
+        } @else {
             @for player in players {
                 div padding=5 border-bottom="1px solid #eee" {
                     span { (player.name) }
                     @if player.is_observer {
                         span margin-left=10 color="#666" { "(Observer)" }
                     }
+                    span margin-left=10 color="#999" { (format!("joined {}", player.joined_at.format("%H:%M"))) }
                 }
             }
         }
@@ -144,83 +160,172 @@ async fn update_players_list(_game_id: &str, players: Vec<Player>) {
 }
 
 async fn update_vote_buttons(game_id: &str, voting_active: bool) {
-    let vote_url = format!("/api/games/{game_id}/vote");
+    tracing::info!(
+        "VOTE BUTTONS: update_vote_buttons called for game {}, voting_active: {}",
+        game_id,
+        voting_active
+    );
 
     let content = if voting_active {
+        tracing::info!("VOTE BUTTONS: Voting is active, using simple test content");
         container! {
-            div margin-top=10 {
-                span { "Your Vote:" }
-                div margin-top=10 {
-                    form hx-post=(vote_url.clone()) {
-                        input type="hidden" name="vote" value="1";
-                        button type="submit" margin=5 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 { "1" }
-                    }
-                    form hx-post=(vote_url.clone()) {
-                        input type="hidden" name="vote" value="2";
-                        button type="submit" margin=5 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 { "2" }
-                    }
-                    form hx-post=(vote_url.clone()) {
-                        input type="hidden" name="vote" value="3";
-                        button type="submit" margin=5 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 { "3" }
-                    }
-                    form hx-post=(vote_url.clone()) {
-                        input type="hidden" name="vote" value="5";
-                        button type="submit" margin=5 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 { "5" }
-                    }
-                    form hx-post=(vote_url.clone()) {
-                        input type="hidden" name="vote" value="8";
-                        button type="submit" margin=5 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 { "8" }
-                    }
-                    form hx-post=(vote_url.clone()) {
-                        input type="hidden" name="vote" value="13";
-                        button type="submit" margin=5 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 { "13" }
-                    }
-                    form hx-post=(vote_url) {
-                        input type="hidden" name="vote" value="?";
-                        button type="submit" margin=5 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 { "?" }
-                    }
-                }
+            div {
+                "VOTING IS ACTIVE - TEST MESSAGE"
             }
         }
     } else {
+        tracing::info!("VOTE BUTTONS: Voting is not active, showing inactive message");
         container! {
-            div margin-top=10 color="#666" {
-                "Voting not active"
+            div color="#666" {
+                "Voting not active. Click 'Start Voting' to begin."
             }
         }
     };
 
+    tracing::info!("VOTE BUTTONS: About to send partial update to vote-buttons target");
     send_partial_update("vote-buttons", content).await;
 }
 
-async fn update_vote_results(_game_id: &str, votes: Vec<Vote>, revealed: bool) {
-    let content = if revealed {
+async fn update_entire_voting_section(game_id: &str, voting_active: bool) {
+    tracing::info!(
+        "VOTING SECTION: Updating entire voting section for game {}, voting_active: {}",
+        game_id,
+        voting_active
+    );
+
+    let content = planning_poker_ui::voting_section(game_id, voting_active);
+    send_partial_update("voting-section", content).await;
+}
+
+async fn update_story_input(game_id: &str, voting_active: bool) {
+    let start_voting_url = format!("/api/games/{game_id}/start-voting");
+
+    let content = if voting_active {
         container! {
-            div {
-                h3 { "Vote Results:" }
-                @if votes.is_empty() {
-                    div color="#666" { "No votes cast" }
-                } @else {
-                    @for vote in votes {
-                        div padding=5 {
-                            span { (format!("Player {}: {}", vote.player_id, vote.value)) }
-                        }
-                    }
-                }
+            span { "Story:" }
+            input type="text" placeholder="Enter story to vote on" margin-left=10;
+            button hx-post=(start_voting_url) margin-left=10 padding=5 background="#007bff" color="#fff" border="none" border-radius=3 disabled {
+                "Voting Active"
             }
         }
     } else {
         container! {
+            span { "Story:" }
+            input type="text" placeholder="Enter story to vote on" margin-left=10;
+            button hx-post=(start_voting_url) margin-left=10 padding=5 background="#007bff" color="#fff" border="none" border-radius=3 {
+                "Start Voting"
+            }
+        }
+    };
+
+    send_partial_update("story-input", content).await;
+}
+
+async fn update_vote_results(_game_id: &str, votes: Vec<Vote>, revealed: bool) {
+    tracing::info!(
+        "Updating vote results: {} votes, revealed: {}",
+        votes.len(),
+        revealed
+    );
+
+    // Log individual votes for debugging
+    for (i, vote) in votes.iter().enumerate() {
+        tracing::info!(
+            "Vote {}: player_id={}, value={}, cast_at={}",
+            i,
+            vote.player_id,
+            vote.value,
+            vote.cast_at
+        );
+    }
+
+    if votes.is_empty() {
+        tracing::info!("No votes found - will show 'No votes cast yet' message");
+    } else if revealed {
+        tracing::info!("Votes are revealed - will show actual vote values");
+    } else {
+        tracing::info!("Votes are hidden - will show vote count only");
+    }
+
+    let content = container! {
+        @if votes.is_empty() {
+            div color="#666" { "No votes cast yet" }
+        } @else if revealed {
+            div {
+                h3 { "Vote Results:" }
+                @for vote in votes {
+                    div padding=5 border-bottom="1px solid #eee" {
+                        span { (format!("Player {}: {}", vote.player_id, vote.value)) }
+                        span margin-left=10 color="#999" { (format!("cast at {}", vote.cast_at.format("%H:%M:%S"))) }
+                    }
+                }
+            }
+        } @else {
             div {
                 span { (format!("{} votes cast", votes.len())) }
-                @if !votes.is_empty() {
-                    span margin-left=10 color="#666" { "(hidden)" }
-                }
+                span margin-left=10 color="#666" { "(hidden until revealed)" }
             }
         }
     };
 
     send_partial_update("vote-results", content).await;
+}
+
+async fn update_game_actions(game_id: &str, game_state: GameState) {
+    tracing::info!(
+        "GAME ACTIONS: Updating game actions for game {}, state: {:?}",
+        game_id,
+        game_state
+    );
+
+    let reveal_url = format!("/api/games/{game_id}/reveal");
+    let reset_url = format!("/api/games/{game_id}/reset");
+
+    let content = container! {
+        @if matches!(game_state, GameState::Revealed) {
+            button hx-post=(reveal_url) margin=5 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 disabled {
+                "Votes Revealed"
+            }
+            button hx-post=(reset_url) margin=5 padding=10 background="#ffc107" color="#000" border="none" border-radius=5 {
+                "Reset Voting"
+            }
+        } @else if matches!(game_state, GameState::Voting) {
+            button hx-post=(reveal_url) margin=5 padding=10 background="#dc3545" color="#fff" border="none" border-radius=5 {
+                "Reveal Votes"
+            }
+            button hx-post=(reset_url) margin=5 padding=10 background="#ffc107" color="#000" border="none" border-radius=5 {
+                "Reset Voting"
+            }
+        } @else {
+            // Waiting state - no votes to reveal yet, no need for reset
+            div color="#666" {
+                "Start voting to see action buttons"
+            }
+        }
+    };
+
+    send_partial_update("game-actions", content).await;
+}
+
+async fn update_entire_results_section(game_id: &str, votes: Vec<Vote>, votes_revealed: bool) {
+    tracing::info!(
+        "RESULTS SECTION: Updating entire results section for game {}, {} votes, revealed: {}",
+        game_id,
+        votes.len(),
+        votes_revealed
+    );
+
+    let content = planning_poker_ui::results_section(game_id, &votes, votes_revealed);
+    send_partial_update("results-section", content).await;
+}
+
+pub fn set_renderer(renderer: Arc<dyn Renderer>) {
+    tracing::info!("set_renderer called");
+    if RENDERER.set(renderer).is_err() {
+        tracing::warn!("RENDERER already initialized");
+    } else {
+        tracing::info!("RENDERER successfully initialized");
+    }
 }
 
 pub fn create_app_router(session_manager: Arc<dyn SessionManager>) -> Router {
@@ -274,8 +379,6 @@ pub fn create_app_router(session_manager: Arc<dyn SessionManager>) -> Router {
                             start_voting_route(req, session_manager).await
                         } else if req.path.ends_with("/reset") {
                             reset_voting_route(req, session_manager).await
-                        } else if req.path.ends_with("/events") {
-                            sse_events_route(req, session_manager).await
                         } else {
                             // Default to get_game_route for paths like /api/games/uuid
                             get_game_route(req, session_manager).await
@@ -592,29 +695,29 @@ pub async fn vote_route(
     };
     match session_manager.cast_vote(game_id, vote).await {
         Ok(_) => {
-            // Get updated game data and return complete page
-            match session_manager.get_game(game_id).await {
-                Ok(Some(game)) => {
-                    let players = session_manager
-                        .get_game_players(game_id)
-                        .await
-                        .unwrap_or_default();
-                    let votes = session_manager
-                        .get_game_votes(game_id)
-                        .await
-                        .unwrap_or_default();
-                    let game_content = planning_poker_ui::game_page_with_data(
-                        game_id_str.to_string(),
-                        game,
-                        players,
-                        votes,
+            tracing::info!(
+                "Vote cast successfully for game {}, triggering partial updates",
+                game_id
+            );
+
+            // Send partial updates via SSE instead of returning full page
+            if let Ok(votes) = session_manager.get_game_votes(game_id).await {
+                if let Ok(Some(game)) = session_manager.get_game(game_id).await {
+                    let revealed = matches!(game.state, GameState::Revealed);
+                    tracing::info!(
+                        "Updating vote results: {} votes, revealed: {}",
+                        votes.len(),
+                        revealed
                     );
-                    Ok(Content::try_view(game_content).unwrap())
+                    update_vote_results(game_id_str, votes, revealed).await;
                 }
-                _ => Err(RouteError::RouteFailed(
-                    "Failed to reload game data".to_string(),
-                )),
             }
+
+            // Return minimal success response
+            let success_content = container! {
+                div { "Vote cast successfully" }
+            };
+            Ok(Content::try_view(success_content).unwrap())
         }
         Err(e) => Err(RouteError::RouteFailed(format!("Failed to cast vote: {e}"))),
     }
@@ -636,81 +739,45 @@ pub async fn reveal_votes_route(
     // Reveal the votes first
     match session_manager.reveal_votes(game_id).await {
         Ok(_) => {
-            // Get updated game data and return complete page
-            match session_manager.get_game(game_id).await {
-                Ok(Some(game)) => {
-                    let players = session_manager
-                        .get_game_players(game_id)
-                        .await
-                        .unwrap_or_default();
-                    let votes = session_manager
-                        .get_game_votes(game_id)
-                        .await
-                        .unwrap_or_default();
-                    let game_content = planning_poker_ui::game_page_with_data(
-                        game_id_str.to_string(),
-                        game,
-                        players,
-                        votes,
-                    );
-                    Ok(Content::try_view(game_content).unwrap())
-                }
-                _ => Err(RouteError::RouteFailed(
-                    "Failed to reload game data".to_string(),
-                )),
+            tracing::info!(
+                "Votes revealed successfully for game {}, triggering partial updates",
+                game_id
+            );
+
+            // Send partial updates via SSE instead of returning full page
+            if let Ok(Some(game)) = session_manager.get_game(game_id).await {
+                let status = match game.state {
+                    GameState::Waiting => "Waiting for players",
+                    GameState::Voting => "Voting in progress",
+                    GameState::Revealed => "Votes revealed",
+                };
+                tracing::info!(
+                    "Game state after reveal: {:?}, status: {}",
+                    game.state,
+                    status
+                );
+                update_game_status(game_id_str, status).await;
+
+                // Update voting section to reflect revealed state
+                let voting_active = matches!(game.state, GameState::Voting);
+                update_entire_voting_section(game_id_str, voting_active).await;
             }
+
+            if let Ok(votes) = session_manager.get_game_votes(game_id).await {
+                tracing::info!("Revealing {} votes", votes.len());
+                update_entire_results_section(game_id_str, votes, true).await;
+            }
+
+            // Return minimal success response
+            let success_content = container! {
+                div { "Votes revealed successfully" }
+            };
+            Ok(Content::try_view(success_content).unwrap())
         }
         Err(e) => Err(RouteError::RouteFailed(format!(
             "Failed to reveal votes: {e}"
         ))),
     }
-}
-
-pub async fn sse_events_route(
-    req: RouteRequest,
-    session_manager: Arc<dyn SessionManager>,
-) -> Result<Content, RouteError> {
-    if !matches!(req.method, Method::Get) {
-        return Err(RouteError::UnsupportedMethod);
-    }
-
-    // Extract game_id from path like "/api/games/uuid-here/events"
-    let path_parts: Vec<&str> = req.path.split('/').collect();
-    let game_id_str = path_parts.get(3).unwrap_or(&"");
-    let game_id = Uuid::parse_str(game_id_str)?;
-
-    // Send initial game state (for now, just log - real SSE implementation would go here)
-    if let Ok(Some(game)) = session_manager.get_game(game_id).await {
-        let status = match game.state {
-            GameState::Waiting => "Waiting",
-            GameState::Voting => "Voting",
-            GameState::Revealed => "Revealed",
-        };
-        update_game_status(game_id_str, status).await;
-
-        // Update vote buttons based on game state
-        let voting_active = matches!(game.state, GameState::Voting);
-        update_vote_buttons(game_id_str, voting_active).await;
-    }
-
-    if let Ok(players) = session_manager.get_game_players(game_id).await {
-        update_players_list(game_id_str, players).await;
-    }
-
-    if let Ok(votes) = session_manager.get_game_votes(game_id).await {
-        if let Ok(Some(game)) = session_manager.get_game(game_id).await {
-            let revealed = matches!(game.state, GameState::Revealed);
-            update_vote_results(game_id_str, votes, revealed).await;
-        }
-    }
-
-    // Return SSE stream setup
-    let sse_content = container! {
-        div {
-            "SSE connection established"
-        }
-    };
-    Ok(Content::try_view(sse_content).unwrap())
 }
 
 pub async fn start_voting_route(
@@ -726,35 +793,62 @@ pub async fn start_voting_route(
     let game_id_str = path_parts.get(3).unwrap_or(&"");
     let game_id = Uuid::parse_str(game_id_str)?;
 
+    tracing::info!("START VOTING: Received request for game {}", game_id);
+
+    // Check current game state before starting voting
+    if let Ok(Some(game)) = session_manager.get_game(game_id).await {
+        tracing::info!(
+            "START VOTING: Current game state before start: {:?}",
+            game.state
+        );
+    }
+
     // TODO: Parse story from request body if needed
     // For now, use a default story
     let story = "Current Story".to_string();
 
     match session_manager.start_voting(game_id, story).await {
         Ok(_) => {
-            // Get updated game data and return complete page
-            match session_manager.get_game(game_id).await {
-                Ok(Some(game)) => {
-                    let players = session_manager
-                        .get_game_players(game_id)
-                        .await
-                        .unwrap_or_default();
-                    let votes = session_manager
-                        .get_game_votes(game_id)
-                        .await
-                        .unwrap_or_default();
-                    let game_content = planning_poker_ui::game_page_with_data(
-                        game_id_str.to_string(),
-                        game,
-                        players,
-                        votes,
-                    );
-                    Ok(Content::try_view(game_content).unwrap())
-                }
-                _ => Err(RouteError::RouteFailed(
-                    "Failed to reload game data".to_string(),
-                )),
+            tracing::info!(
+                "START VOTING: session_manager.start_voting() completed successfully for game {}",
+                game_id
+            );
+
+            // Send partial updates via SSE instead of returning full page
+            if let Ok(Some(game)) = session_manager.get_game(game_id).await {
+                let status = match game.state {
+                    GameState::Waiting => "Waiting for players",
+                    GameState::Voting => "Voting in progress",
+                    GameState::Revealed => "Votes revealed",
+                };
+                tracing::info!(
+                    "START VOTING: Game state after start_voting call: {:?}, status: {}",
+                    game.state,
+                    status
+                );
+                update_game_status(game_id_str, status).await;
+
+                let voting_active = matches!(game.state, GameState::Voting);
+                tracing::info!("START VOTING: Calculated voting_active: {}", voting_active);
+
+                // Update the entire voting section to avoid partial update conflicts
+                update_entire_voting_section(game_id_str, voting_active).await;
+            } else {
+                tracing::error!("START VOTING: Failed to get game after start_voting call");
             }
+
+            if let Ok(votes) = session_manager.get_game_votes(game_id).await {
+                if let Ok(Some(game)) = session_manager.get_game(game_id).await {
+                    let votes_revealed = matches!(game.state, GameState::Revealed);
+                    update_entire_results_section(game_id_str, votes, votes_revealed).await;
+                }
+            }
+
+            // Return minimal success response
+            let success_content = container! {
+                div { "Voting started successfully" }
+            };
+            Ok(Content::try_view(success_content).unwrap())
         }
         Err(e) => Err(RouteError::RouteFailed(format!(
             "Failed to start voting: {e}"
@@ -777,29 +871,42 @@ pub async fn reset_voting_route(
 
     match session_manager.reset_voting(game_id).await {
         Ok(_) => {
-            // Get updated game data and return complete page
-            match session_manager.get_game(game_id).await {
-                Ok(Some(game)) => {
-                    let players = session_manager
-                        .get_game_players(game_id)
-                        .await
-                        .unwrap_or_default();
-                    let votes = session_manager
-                        .get_game_votes(game_id)
-                        .await
-                        .unwrap_or_default();
-                    let game_content = planning_poker_ui::game_page_with_data(
-                        game_id_str.to_string(),
-                        game,
-                        players,
-                        votes,
-                    );
-                    Ok(Content::try_view(game_content).unwrap())
-                }
-                _ => Err(RouteError::RouteFailed(
-                    "Failed to reload game data".to_string(),
-                )),
+            tracing::info!(
+                "Voting reset successfully for game {}, triggering partial updates",
+                game_id
+            );
+
+            // Send partial updates via SSE instead of returning full page
+            if let Ok(Some(game)) = session_manager.get_game(game_id).await {
+                let status = match game.state {
+                    GameState::Waiting => "Waiting for players",
+                    GameState::Voting => "Voting in progress",
+                    GameState::Revealed => "Votes revealed",
+                };
+                tracing::info!(
+                    "Game state after reset: {:?}, status: {}",
+                    game.state,
+                    status
+                );
+                update_game_status(game_id_str, status).await;
+
+                let voting_active = matches!(game.state, GameState::Voting);
+                update_vote_buttons(game_id_str, voting_active).await;
+                update_story_input(game_id_str, voting_active).await;
+                update_game_actions(game_id_str, game.state).await;
             }
+
+            // After reset, votes should be empty
+            if let Ok(votes) = session_manager.get_game_votes(game_id).await {
+                tracing::info!("Votes after reset: {} votes found", votes.len());
+                update_vote_results(game_id_str, votes, false).await;
+            }
+
+            // Return minimal success response
+            let success_content = container! {
+                div { "Voting reset successfully" }
+            };
+            Ok(Content::try_view(success_content).unwrap())
         }
         Err(e) => Err(RouteError::RouteFailed(format!(
             "Failed to reset voting: {e}"
@@ -817,7 +924,6 @@ mod tests {
     use planning_poker_session::DatabaseSessionManager;
     use std::collections::BTreeMap;
     use std::sync::Arc;
-
     #[tokio::test]
     async fn test_join_game_form_parsing() {
         // Create a mock form data for multipart/form-data

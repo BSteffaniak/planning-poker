@@ -187,14 +187,14 @@ pub fn voting_section(game_id: &str, voting_active: bool) -> Containers {
     let start_voting_url = format!("/api/games/{game_id}/start-voting");
 
     container! {
-        div margin-top=20 {
+        div id="voting-section" margin-top=20 {
             h2 { "Voting" }
 
             // Story input section
             div id="story-input" margin-bottom=15 {
                 span { "Story:" }
                 input type="text" placeholder="Enter story to vote on" margin-left=10;
-                button hx-post=(start_voting_url) hx-swap="#main-content" margin-left=10 padding=5 background="#007bff" color="#fff" border="none" border-radius=3 {
+                button hx-post=(start_voting_url) margin-left=10 padding=5 background="#007bff" color="#fff" border="none" border-radius=3 {
                     "Start Voting"
                 }
             }
@@ -220,7 +220,7 @@ pub fn vote_buttons(game_id: &str) -> Containers {
         span { "Your Vote:" }
         div margin-top=10 {
             @for value in vote_values {
-                form hx-post=(format!("/api/games/{game_id}/vote")) hx-swap="#main-content" {
+                form hx-post=(format!("/api/games/{game_id}/vote")) {
                     input type="hidden" name="vote" value=(value);
                     button type="submit" margin=5 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 { (value) }
                 }
@@ -234,7 +234,7 @@ pub fn results_section(game_id: &str, votes: &[Vote], votes_revealed: bool) -> C
     let reset_url = format!("/api/games/{game_id}/reset");
 
     container! {
-        div margin-top=20 {
+        div id="results-section" margin-top=20 {
             h2 { "Results" }
             div id="vote-results" {
                 @if votes.is_empty() {
@@ -259,10 +259,10 @@ pub fn results_section(game_id: &str, votes: &[Vote], votes_revealed: bool) -> C
 
             // Game action buttons
             div id="game-actions" margin-top=15 {
-                button hx-post=(reveal_url) hx-swap="#main-content" margin=5 padding=10 background="#dc3545" color="#fff" border="none" border-radius=5 {
+                button hx-post=(reveal_url) margin=5 padding=10 background="#dc3545" color="#fff" border="none" border-radius=5 {
                     "Reveal Votes"
                 }
-                button hx-post=(reset_url) hx-swap="#main-content" margin=5 padding=10 background="#ffc107" color="#000" border="none" border-radius=5 {
+                button hx-post=(reset_url) margin=5 padding=10 background="#ffc107" color="#000" border="none" border-radius=5 {
                     "Reset Voting"
                 }
             }
