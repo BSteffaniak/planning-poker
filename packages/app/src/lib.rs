@@ -98,6 +98,11 @@ pub struct VoteRequest {
     pub vote: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct VoteForm {
+    pub vote: String,
+}
+
 pub fn create_app_router(session_manager: Arc<dyn SessionManager>) -> Router {
     planning_poker_ui::create_router()
         .with_route_result("/join-game", {
@@ -388,13 +393,17 @@ pub async fn vote_route(
     let path_parts: Vec<&str> = req.path.split('/').collect();
     let game_id_str = path_parts.get(3).unwrap_or(&"");
     let game_id = Uuid::parse_str(game_id_str)?;
-    let body = req.body.as_ref().ok_or(RouteError::MissingFormData)?;
-    let vote_request: VoteRequest = serde_json::from_slice(body)
-        .map_err(|e| RouteError::ParseBody(ParseError::SerdeJson(e)))?;
+
+    // Parse form data instead of JSON
+    let form_data = req.parse_form::<VoteForm>()?;
+
+    // TODO: Get actual player ID from session management
+    // For now, use a placeholder player ID
+    let player_id = Uuid::new_v4();
 
     let vote = Vote {
-        player_id: vote_request.player_id,
-        value: vote_request.vote,
+        player_id,
+        value: form_data.vote,
         cast_at: Utc::now(),
     };
     match session_manager.cast_vote(game_id, vote).await {

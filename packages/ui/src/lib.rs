@@ -176,13 +176,34 @@ pub fn game_page(game_id: String) -> Containers {
                     div margin-top=15 {
                         span { "Your Vote:" }
                         div margin-top=10 {
-                            button hx-post=(vote_url.clone()) margin=5 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 { "1" }
-                            button hx-post=(vote_url.clone()) margin=5 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 { "2" }
-                            button hx-post=(vote_url.clone()) margin=5 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 { "3" }
-                            button hx-post=(vote_url.clone()) margin=5 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 { "5" }
-                            button hx-post=(vote_url.clone()) margin=5 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 { "8" }
-                            button hx-post=(vote_url.clone()) margin=5 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 { "13" }
-                            button hx-post=(vote_url) margin=5 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 { "?" }
+                            form hx-post=(vote_url.clone()) {
+                                input type="hidden" name="vote" value="1";
+                                button type="submit" margin=5 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 { "1" }
+                            }
+                            form hx-post=(vote_url.clone()) {
+                                input type="hidden" name="vote" value="2";
+                                button type="submit" margin=5 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 { "2" }
+                            }
+                            form hx-post=(vote_url.clone()) {
+                                input type="hidden" name="vote" value="3";
+                                button type="submit" margin=5 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 { "3" }
+                            }
+                            form hx-post=(vote_url.clone()) {
+                                input type="hidden" name="vote" value="5";
+                                button type="submit" margin=5 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 { "5" }
+                            }
+                            form hx-post=(vote_url.clone()) {
+                                input type="hidden" name="vote" value="8";
+                                button type="submit" margin=5 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 { "8" }
+                            }
+                            form hx-post=(vote_url.clone()) {
+                                input type="hidden" name="vote" value="13";
+                                button type="submit" margin=5 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 { "13" }
+                            }
+                            form hx-post=(vote_url) {
+                                input type="hidden" name="vote" value="?";
+                                button type="submit" margin=5 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 { "?" }
+                            }
                         }
                     }
 
