@@ -27,6 +27,7 @@ pub trait SessionManager: Send + Sync {
     async fn clear_game_votes(&self, game_id: Uuid) -> Result<()>;
 
     async fn start_voting(&self, game_id: Uuid, story: String) -> Result<()>;
+    async fn reveal_votes(&self, game_id: Uuid) -> Result<()>;
     async fn reset_voting(&self, game_id: Uuid) -> Result<()>;
 
     async fn create_session(&self, session: Session) -> Result<()>;
@@ -135,6 +136,19 @@ fn rows_to_players(rows: Vec<Row>) -> Result<Vec<Player>> {
     rows.iter().map(row_to_player).collect()
 }
 
+fn row_to_vote(row: &Row) -> Result<Vote> {
+    Ok(Vote {
+        player_id: Uuid::parse_str(&get_string_from_row(row, "player_id")?)?,
+        value: get_string_from_row(row, "value")?,
+        cast_at: DateTime::parse_from_rfc3339(&get_string_from_row(row, "cast_at")?)?
+            .with_timezone(&Utc),
+    })
+}
+
+fn rows_to_votes(rows: Vec<Row>) -> Result<Vec<Vote>> {
+    rows.iter().map(row_to_vote).collect()
+}
+
 #[async_trait]
 impl SessionManager for DatabaseSessionManager {
     async fn create_game(
@@ -197,8 +211,37 @@ impl SessionManager for DatabaseSessionManager {
     }
 
     async fn update_game(&self, game: &Game) -> Result<()> {
-        // TODO: Implement database update
         tracing::info!("Updating game: {:?}", game);
+
+        let state_str = match game.state {
+            GameState::Waiting => "Waiting",
+            GameState::Voting => "Voting",
+            GameState::Revealed => "Revealed",
+        };
+
+        self.db
+            .update("games")
+            .value("name", DatabaseValue::String(game.name.clone()))
+            .value(
+                "voting_system",
+                DatabaseValue::String(game.voting_system.clone()),
+            )
+            .value("state", DatabaseValue::String(state_str.to_string()))
+            .value(
+                "current_story",
+                match &game.current_story {
+                    Some(story) => DatabaseValue::String(story.clone()),
+                    None => DatabaseValue::Null,
+                },
+            )
+            .value(
+                "updated_at",
+                DatabaseValue::String(game.updated_at.to_rfc3339()),
+            )
+            .where_eq("id", DatabaseValue::String(game.id.to_string()))
+            .execute(&**self.db)
+            .await?;
+
         Ok(())
     }
 
@@ -251,20 +294,58 @@ impl SessionManager for DatabaseSessionManager {
     }
 
     async fn cast_vote(&self, game_id: Uuid, vote: Vote) -> Result<()> {
-        // TODO: Implement database insertion/update
         tracing::info!("Casting vote for game {}: {:?}", game_id, vote);
+
+        // First, delete any existing vote from this player for this game
+        self.db
+            .delete("votes")
+            .where_eq("game_id", DatabaseValue::String(game_id.to_string()))
+            .where_eq(
+                "player_id",
+                DatabaseValue::String(vote.player_id.to_string()),
+            )
+            .execute(&**self.db)
+            .await?;
+
+        // Insert the new vote
+        self.db
+            .insert("votes")
+            .value("game_id", DatabaseValue::String(game_id.to_string()))
+            .value(
+                "player_id",
+                DatabaseValue::String(vote.player_id.to_string()),
+            )
+            .value("value", DatabaseValue::String(vote.value))
+            .value("cast_at", DatabaseValue::String(vote.cast_at.to_rfc3339()))
+            .execute(&**self.db)
+            .await?;
+
         Ok(())
     }
 
     async fn get_game_votes(&self, game_id: Uuid) -> Result<Vec<Vote>> {
-        // TODO: Implement database query
         tracing::info!("Getting votes for game: {}", game_id);
-        Ok(vec![])
+
+        let rows = self
+            .db
+            .select("votes")
+            .where_eq("game_id", DatabaseValue::String(game_id.to_string()))
+            .execute(&**self.db)
+            .await?;
+
+        let votes = rows_to_votes(rows)?;
+        Ok(votes)
     }
 
     async fn clear_game_votes(&self, game_id: Uuid) -> Result<()> {
-        // TODO: Implement database deletion
         tracing::info!("Clearing votes for game: {}", game_id);
+
+        self.db
+            .delete("votes")
+            .where_eq("game_id", DatabaseValue::String(game_id.to_string()))
+            .execute(&**self.db)
+            .await?;
+
         Ok(())
     }
 
@@ -306,6 +387,21 @@ impl SessionManager for DatabaseSessionManager {
             .update("games")
             .value("state", DatabaseValue::String("Voting".to_string()))
             .value("current_story", DatabaseValue::String(story))
+            .value("updated_at", DatabaseValue::String(now.to_rfc3339()))
+            .where_eq("id", DatabaseValue::String(game_id.to_string()))
+            .execute(&**self.db)
+            .await?;
+
+        Ok(())
+    }
+
+    async fn reveal_votes(&self, game_id: Uuid) -> Result<()> {
+        tracing::info!("Revealing votes for game {}", game_id);
+
+        let now = Utc::now();
+        self.db
+            .update("games")
+            .value("state", DatabaseValue::String("Revealed".to_string()))
             .value("updated_at", DatabaseValue::String(now.to_rfc3339()))
             .where_eq("id", DatabaseValue::String(game_id.to_string()))
             .execute(&**self.db)

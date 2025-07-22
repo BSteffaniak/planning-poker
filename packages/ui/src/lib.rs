@@ -3,6 +3,7 @@ use hyperchad::{
     router::{RouteRequest, Router},
     template::{self as hyperchad_template, container, Containers},
 };
+use planning_poker_models::{Game, GameState, Player, Vote};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -66,42 +67,22 @@ impl PlanningPokerApp {
 }
 
 pub fn create_router() -> Router {
-    Router::new()
-        .with_route_result("/", |_request: RouteRequest| {
-            let content = home_page();
-            let container = content.into_iter().next().unwrap_or_default();
-            async move {
-                Ok::<View, anyhow::Error>(View {
-                    immediate: container,
-                    future: None,
-                })
-            }
-        })
-        .with_route_result(
-            hyperchad::router::RoutePath::LiteralPrefix("/game/".to_string()),
-            |request: RouteRequest| {
-                // Extract game_id from path like "/game/uuid-here"
-                let game_id = request
-                    .path
-                    .strip_prefix("/game/")
-                    .unwrap_or("")
-                    .to_string();
-                let content = game_page(game_id);
-                let container = content.into_iter().next().unwrap_or_default();
-                async move {
-                    Ok::<View, anyhow::Error>(View {
-                        immediate: container,
-                        future: None,
-                    })
-                }
-            },
-        )
+    Router::new().with_route_result("/", |_request: RouteRequest| {
+        let content = home_page();
+        let container = content.into_iter().next().unwrap_or_default();
+        async move {
+            Ok::<View, anyhow::Error>(View {
+                immediate: container,
+                future: None,
+            })
+        }
+    })
 }
 
 #[must_use]
 pub fn home_page() -> Containers {
     container! {
-        div width=100% height=100% padding=20 {
+        div id="main-content" width=100% height=100% padding=20 {
             h1 { "Planning Poker" }
             div { "Welcome to Planning Poker!" }
 
@@ -142,95 +123,192 @@ pub fn home_page() -> Containers {
     }
 }
 
-#[must_use]
-pub fn game_page(game_id: String) -> Containers {
-    let game_id_display = format!("Game ID: {game_id}");
+// UI Component Functions
+
+pub fn game_status_section(status: &str) -> Containers {
+    container! {
+        div id="game-status" margin-top=20 {
+            div padding=10 background="#f0f0f0" border-radius=5 {
+                span { "Status: " }
+                span { (status) }
+            }
+        }
+    }
+}
+
+pub fn players_section(players: &[Player]) -> Containers {
+    container! {
+        div margin-top=20 {
+            h2 { "Players" }
+            div id="players-list" {
+                @if players.is_empty() {
+                    div color="#666" { "No players yet" }
+                } @else {
+                    @for player in players {
+                        div padding=5 border-bottom="1px solid #eee" {
+                            span { (player.name) }
+                            @if player.is_observer {
+                                span margin-left=10 color="#666" { "(Observer)" }
+                            }
+                            span margin-left=10 color="#999" { (format!("joined {}", player.joined_at.format("%H:%M"))) }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+pub fn voting_section(game_id: &str, voting_active: bool) -> Containers {
     let start_voting_url = format!("/api/games/{game_id}/start-voting");
-    let vote_url = format!("/api/games/{game_id}/vote");
+
+    container! {
+        div margin-top=20 {
+            h2 { "Voting" }
+
+            // Story input section
+            div id="story-input" margin-bottom=15 {
+                span { "Story:" }
+                input type="text" placeholder="Enter story to vote on" margin-left=10;
+                button hx-post=(start_voting_url) hx-swap="#main-content" margin-left=10 padding=5 background="#007bff" color="#fff" border="none" border-radius=3 {
+                    "Start Voting"
+                }
+            }
+
+            // Vote buttons section
+            div id="vote-buttons" margin-top=15 {
+                @if voting_active {
+                    (vote_buttons(game_id))
+                } @else {
+                    div color="#666" {
+                        "Voting not active. Click 'Start Voting' to begin."
+                    }
+                }
+            }
+        }
+    }
+}
+
+pub fn vote_buttons(game_id: &str) -> Containers {
+    let vote_values = ["1", "2", "3", "5", "8", "13", "?"];
+
+    container! {
+        span { "Your Vote:" }
+        div margin-top=10 {
+            @for value in vote_values {
+                form hx-post=(format!("/api/games/{game_id}/vote")) hx-swap="#main-content" {
+                    input type="hidden" name="vote" value=(value);
+                    button type="submit" margin=5 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 { (value) }
+                }
+            }
+        }
+    }
+}
+
+pub fn results_section(game_id: &str, votes: &[Vote], votes_revealed: bool) -> Containers {
     let reveal_url = format!("/api/games/{game_id}/reveal");
     let reset_url = format!("/api/games/{game_id}/reset");
 
     container! {
-        div width=100% height=100% padding=20 {
+        div margin-top=20 {
+            h2 { "Results" }
+            div id="vote-results" {
+                @if votes.is_empty() {
+                    div color="#666" { "No votes cast yet" }
+                } @else if votes_revealed {
+                    div {
+                        h3 { "Vote Results:" }
+                        @for vote in votes {
+                            div padding=5 border-bottom="1px solid #eee" {
+                                span { (format!("Player {}: {}", vote.player_id, vote.value)) }
+                                span margin-left=10 color="#999" { (format!("cast at {}", vote.cast_at.format("%H:%M:%S"))) }
+                            }
+                        }
+                    }
+                } @else {
+                    div {
+                        span { (format!("{} votes cast", votes.len())) }
+                        span margin-left=10 color="#666" { "(hidden until revealed)" }
+                    }
+                }
+            }
+
+            // Game action buttons
+            div id="game-actions" margin-top=15 {
+                button hx-post=(reveal_url) hx-swap="#main-content" margin=5 padding=10 background="#dc3545" color="#fff" border="none" border-radius=5 {
+                    "Reveal Votes"
+                }
+                button hx-post=(reset_url) hx-swap="#main-content" margin=5 padding=10 background="#ffc107" color="#000" border="none" border-radius=5 {
+                    "Reset Voting"
+                }
+            }
+        }
+    }
+}
+
+pub fn game_page_with_data(
+    game_id: String,
+    game: Game,
+    players: Vec<Player>,
+    votes: Vec<Vote>,
+) -> Containers {
+    let game_id_display = format!("Game ID: {game_id}");
+    let status_text = match game.state {
+        GameState::Waiting => "Waiting for players",
+        GameState::Voting => "Voting in progress",
+        GameState::Revealed => "Votes revealed",
+    };
+    let voting_active = matches!(game.state, GameState::Voting);
+    let votes_revealed = matches!(game.state, GameState::Revealed);
+
+    container! {
+        div id="main-content" width=100% height=100% padding=20 {
             h1 { "Planning Poker Game" }
             div { (game_id_display) }
+            div { (format!("Game: {}", game.name)) }
 
-            div margin-top=20 {
-                h2 { "Players" }
-                div id="players-list" {
-                    "Loading players..."
-                }
-            }
-
-            div margin-top=20 {
-                h2 { "Voting" }
-                div id="voting-section" {
-                    div margin-bottom=10 {
-                        span { "Story:" }
-                        input type="text" id="story-input" placeholder="Enter story to vote on" margin-left=10;
-                        button hx-post=(start_voting_url) margin-left=10 padding=5 background="#007bff" color="#fff" border="none" border-radius=3 {
-                            "Start Voting"
-                        }
-                    }
-
-                    div margin-top=15 {
-                        span { "Your Vote:" }
-                        div margin-top=10 {
-                            form hx-post=(vote_url.clone()) {
-                                input type="hidden" name="vote" value="1";
-                                button type="submit" margin=5 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 { "1" }
-                            }
-                            form hx-post=(vote_url.clone()) {
-                                input type="hidden" name="vote" value="2";
-                                button type="submit" margin=5 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 { "2" }
-                            }
-                            form hx-post=(vote_url.clone()) {
-                                input type="hidden" name="vote" value="3";
-                                button type="submit" margin=5 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 { "3" }
-                            }
-                            form hx-post=(vote_url.clone()) {
-                                input type="hidden" name="vote" value="5";
-                                button type="submit" margin=5 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 { "5" }
-                            }
-                            form hx-post=(vote_url.clone()) {
-                                input type="hidden" name="vote" value="8";
-                                button type="submit" margin=5 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 { "8" }
-                            }
-                            form hx-post=(vote_url.clone()) {
-                                input type="hidden" name="vote" value="13";
-                                button type="submit" margin=5 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 { "13" }
-                            }
-                            form hx-post=(vote_url) {
-                                input type="hidden" name="vote" value="?";
-                                button type="submit" margin=5 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 { "?" }
-                            }
-                        }
-                    }
-
-                    div margin-top=15 {
-                        button hx-post=(reveal_url) margin=5 padding=10 background="#dc3545" color="#fff" border="none" border-radius=5 {
-                            "Reveal Votes"
-                        }
-                        button hx-post=(reset_url) margin=5 padding=10 background="#ffc107" color="#000" border="none" border-radius=5 {
-                            "Reset Voting"
-                        }
-                    }
-                }
-            }
-
-            div margin-top=20 {
-                h2 { "Results" }
-                div id="results-section" {
-                    "No votes yet"
-                }
-            }
-
-
+            (game_status_section(&status_text))
+            (players_section(&players))
+            (voting_section(&game_id, voting_active))
+            (results_section(&game_id, &votes, votes_revealed))
 
             div margin-top=30 {
                 anchor href="/" {
                     "← Back to Home"
                 }
+            }
+        }
+    }
+}
+
+pub fn game_content_with_data(
+    game_id: String,
+    game: Game,
+    players: Vec<Player>,
+    votes: Vec<Vote>,
+) -> Containers {
+    let game_id_display = format!("Game ID: {game_id}");
+    let status_text = match game.state {
+        GameState::Waiting => "Waiting for players",
+        GameState::Voting => "Voting in progress",
+        GameState::Revealed => "Votes revealed",
+    };
+    let voting_active = matches!(game.state, GameState::Voting);
+    let votes_revealed = matches!(game.state, GameState::Revealed);
+
+    container! {
+        h1 { "Planning Poker Game" }
+        div { (game_id_display) }
+        div { (format!("Game: {}", game.name)) }
+
+        (game_status_section(&status_text))
+        (players_section(&players))
+        (voting_section(&game_id, voting_active))
+        (results_section(&game_id, &votes, votes_revealed))
+
+        div margin-top=30 {
+            anchor href="/" {
+                "← Back to Home"
             }
         }
     }

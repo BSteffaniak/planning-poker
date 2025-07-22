@@ -3,10 +3,10 @@ use chrono::Utc;
 use hyperchad::{
     renderer::Content,
     router::{ParseError, RouteRequest, Router},
-    template::{self as hyperchad_template, container},
+    template::{self as hyperchad_template, container, Containers},
     transformer::html::ParseError as HtmlParseError,
 };
-use planning_poker_models::{Player, Vote};
+use planning_poker_models::{GameState, Player, Vote};
 use planning_poker_session::SessionManager;
 use serde::Deserialize;
 use std::sync::Arc;
@@ -103,6 +103,126 @@ pub struct VoteForm {
     pub vote: String,
 }
 
+// SSE Partial Update Helper Functions
+async fn send_partial_update(target: &str, _content: Containers) {
+    // TODO: Implement actual SSE broadcasting
+    // For now, this is a placeholder that would send via SSE channel
+    tracing::info!("SSE Update: target={}, content rendered", target);
+
+    // In a real implementation, this would:
+    // let partial = PartialView {
+    //     target: target.to_string(),
+    //     content: Content::try_view(content).unwrap(),
+    // };
+    // sse_sender.send(RendererEvent::Partial(partial)).await;
+}
+
+async fn update_game_status(_game_id: &str, status: &str) {
+    let content = container! {
+        div padding=10 background="#f0f0f0" border-radius=5 {
+            span { "Status: " }
+            span { (status) }
+        }
+    };
+    send_partial_update("game-status", content).await;
+}
+
+async fn update_players_list(_game_id: &str, players: Vec<Player>) {
+    let content = container! {
+        div {
+            @for player in players {
+                div padding=5 border-bottom="1px solid #eee" {
+                    span { (player.name) }
+                    @if player.is_observer {
+                        span margin-left=10 color="#666" { "(Observer)" }
+                    }
+                }
+            }
+        }
+    };
+    send_partial_update("players-list", content).await;
+}
+
+async fn update_vote_buttons(game_id: &str, voting_active: bool) {
+    let vote_url = format!("/api/games/{game_id}/vote");
+
+    let content = if voting_active {
+        container! {
+            div margin-top=10 {
+                span { "Your Vote:" }
+                div margin-top=10 {
+                    form hx-post=(vote_url.clone()) {
+                        input type="hidden" name="vote" value="1";
+                        button type="submit" margin=5 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 { "1" }
+                    }
+                    form hx-post=(vote_url.clone()) {
+                        input type="hidden" name="vote" value="2";
+                        button type="submit" margin=5 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 { "2" }
+                    }
+                    form hx-post=(vote_url.clone()) {
+                        input type="hidden" name="vote" value="3";
+                        button type="submit" margin=5 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 { "3" }
+                    }
+                    form hx-post=(vote_url.clone()) {
+                        input type="hidden" name="vote" value="5";
+                        button type="submit" margin=5 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 { "5" }
+                    }
+                    form hx-post=(vote_url.clone()) {
+                        input type="hidden" name="vote" value="8";
+                        button type="submit" margin=5 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 { "8" }
+                    }
+                    form hx-post=(vote_url.clone()) {
+                        input type="hidden" name="vote" value="13";
+                        button type="submit" margin=5 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 { "13" }
+                    }
+                    form hx-post=(vote_url) {
+                        input type="hidden" name="vote" value="?";
+                        button type="submit" margin=5 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 { "?" }
+                    }
+                }
+            }
+        }
+    } else {
+        container! {
+            div margin-top=10 color="#666" {
+                "Voting not active"
+            }
+        }
+    };
+
+    send_partial_update("vote-buttons", content).await;
+}
+
+async fn update_vote_results(_game_id: &str, votes: Vec<Vote>, revealed: bool) {
+    let content = if revealed {
+        container! {
+            div {
+                h3 { "Vote Results:" }
+                @if votes.is_empty() {
+                    div color="#666" { "No votes cast" }
+                } @else {
+                    @for vote in votes {
+                        div padding=5 {
+                            span { (format!("Player {}: {}", vote.player_id, vote.value)) }
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        container! {
+            div {
+                span { (format!("{} votes cast", votes.len())) }
+                @if !votes.is_empty() {
+                    span margin-left=10 color="#666" { "(hidden)" }
+                }
+            }
+        }
+    };
+
+    send_partial_update("vote-results", content).await;
+}
+
 pub fn create_app_router(session_manager: Arc<dyn SessionManager>) -> Router {
     planning_poker_ui::create_router()
         .with_route_result("/join-game", {
@@ -112,6 +232,16 @@ pub fn create_app_router(session_manager: Arc<dyn SessionManager>) -> Router {
                 async move { join_game_route(req, session_manager).await }
             }
         })
+        .with_route_result(
+            hyperchad::router::RoutePath::LiteralPrefix("/game/".to_string()),
+            {
+                let session_manager = session_manager.clone();
+                move |req| {
+                    let session_manager = session_manager.clone();
+                    async move { game_page_route(req, session_manager).await }
+                }
+            },
+        )
         .with_route_result("/api/games", {
             let session_manager = session_manager.clone();
             move |req| {
@@ -202,10 +332,10 @@ pub async fn join_game_route(
                         (format!("Successfully joined game {} as {}", form_data.game_id, form_data.player_name))
                     }
                     div margin-top=20 {
-                        button hx-get=(format!("/game/{}", form_data.game_id)) margin=10 padding=10 background="#007bff" color="#fff" border="none" border-radius=5 {
+                        button hx-get=(format!("/game/{}", form_data.game_id)) hx-swap="#main-content" margin=10 padding=10 background="#007bff" color="#fff" border="none" border-radius=5 {
                             "Go to Game"
                         }
-                        button hx-get="/" margin=10 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 {
+                        button hx-get="/" hx-swap="#main-content" margin=10 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 {
                             "Back to Home"
                         }
                     }
@@ -260,10 +390,10 @@ pub async fn create_game_route(
                         (format!("Game ID: {}", game.id))
                     }
                     div margin-top=20 {
-                        button hx-get=(format!("/game/{}", game.id)) margin=10 padding=10 background="#007bff" color="#fff" border="none" border-radius=5 {
+                        button hx-get=(format!("/game/{}", game.id)) hx-swap="#main-content" margin=10 padding=10 background="#007bff" color="#fff" border="none" border-radius=5 {
                             "Go to Game"
                         }
-                        button hx-get="/" margin=10 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 {
+                        button hx-get="/" hx-swap="#main-content" margin=10 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 {
                             "Back to Home"
                         }
                     }
@@ -274,6 +404,41 @@ pub async fn create_game_route(
         Err(e) => Err(RouteError::RouteFailed(format!(
             "Failed to create game: {e}"
         ))),
+    }
+}
+
+pub async fn game_page_route(
+    req: RouteRequest,
+    session_manager: Arc<dyn SessionManager>,
+) -> Result<Content, RouteError> {
+    if !matches!(req.method, Method::Get) {
+        return Err(RouteError::UnsupportedMethod);
+    }
+
+    // Extract game_id from path like "/game/uuid-here"
+    let game_id_str = req.path.strip_prefix("/game/").unwrap_or("");
+    let game_id = Uuid::parse_str(game_id_str)?;
+
+    match session_manager.get_game(game_id).await {
+        Ok(Some(game)) => {
+            let players = session_manager
+                .get_game_players(game_id)
+                .await
+                .unwrap_or_default();
+            let votes = session_manager
+                .get_game_votes(game_id)
+                .await
+                .unwrap_or_default();
+            let game_content = planning_poker_ui::game_page_with_data(
+                game_id_str.to_string(),
+                game,
+                players,
+                votes,
+            );
+            Ok(Content::try_view(game_content).unwrap())
+        }
+        Ok(None) => Err(RouteError::RouteFailed("Game not found".to_string())),
+        Err(e) => Err(RouteError::RouteFailed(format!("Database error: {e}"))),
     }
 }
 
@@ -364,6 +529,11 @@ pub async fn join_game_api_route(
                 .await
             {
                 Ok(_) => {
+                    // Send real-time updates to all connected clients
+                    if let Ok(players) = session_manager.get_game_players(game_id).await {
+                        update_players_list(game_id_str, players).await;
+                    }
+
                     let success_content = container! {
                         div padding=20 {
                             h2 { "Joined Game!" }
@@ -398,8 +568,16 @@ pub async fn vote_route(
     let form_data = req.parse_form::<VoteForm>()?;
 
     // TODO: Get actual player ID from session management
-    // For now, use a placeholder player ID
-    let player_id = Uuid::new_v4();
+    // For now, use the first player in the game as a workaround
+    let players = session_manager
+        .get_game_players(game_id)
+        .await
+        .unwrap_or_default();
+    let player_id = if let Some(first_player) = players.first() {
+        first_player.id
+    } else {
+        return Err(RouteError::RouteFailed("No players in game".to_string()));
+    };
 
     let vote = Vote {
         player_id,
@@ -408,13 +586,29 @@ pub async fn vote_route(
     };
     match session_manager.cast_vote(game_id, vote).await {
         Ok(_) => {
-            let success_content = container! {
-                div padding=20 {
-                    h2 { "Vote Cast!" }
-                    div { "Your vote has been recorded successfully" }
+            // Get updated game data and return complete page
+            match session_manager.get_game(game_id).await {
+                Ok(Some(game)) => {
+                    let players = session_manager
+                        .get_game_players(game_id)
+                        .await
+                        .unwrap_or_default();
+                    let votes = session_manager
+                        .get_game_votes(game_id)
+                        .await
+                        .unwrap_or_default();
+                    let game_content = planning_poker_ui::game_content_with_data(
+                        game_id_str.to_string(),
+                        game,
+                        players,
+                        votes,
+                    );
+                    Ok(Content::try_view(game_content).unwrap())
                 }
-            };
-            Ok(Content::try_view(success_content).unwrap())
+                _ => Err(RouteError::RouteFailed(
+                    "Failed to reload game data".to_string(),
+                )),
+            }
         }
         Err(e) => Err(RouteError::RouteFailed(format!("Failed to cast vote: {e}"))),
     }
@@ -422,7 +616,7 @@ pub async fn vote_route(
 
 pub async fn reveal_votes_route(
     req: RouteRequest,
-    _session_manager: Arc<dyn SessionManager>,
+    session_manager: Arc<dyn SessionManager>,
 ) -> Result<Content, RouteError> {
     if !matches!(req.method, Method::Post) {
         return Err(RouteError::UnsupportedMethod);
@@ -431,22 +625,44 @@ pub async fn reveal_votes_route(
     // Extract game_id from path like "/api/games/uuid-here/reveal"
     let path_parts: Vec<&str> = req.path.split('/').collect();
     let game_id_str = path_parts.get(3).unwrap_or(&"");
-    let _game_id = Uuid::parse_str(game_id_str)?;
+    let game_id = Uuid::parse_str(game_id_str)?;
 
-    // TODO: Implement reveal votes by updating game state
-    // For now, just return success
-    let success_content = container! {
-    div padding=20 {
-        h2 { "Votes Revealed!" }
-        div { "All votes have been revealed successfully" }
+    // Reveal the votes first
+    match session_manager.reveal_votes(game_id).await {
+        Ok(_) => {
+            // Get updated game data and return complete page
+            match session_manager.get_game(game_id).await {
+                Ok(Some(game)) => {
+                    let players = session_manager
+                        .get_game_players(game_id)
+                        .await
+                        .unwrap_or_default();
+                    let votes = session_manager
+                        .get_game_votes(game_id)
+                        .await
+                        .unwrap_or_default();
+                    let game_content = planning_poker_ui::game_content_with_data(
+                        game_id_str.to_string(),
+                        game,
+                        players,
+                        votes,
+                    );
+                    Ok(Content::try_view(game_content).unwrap())
+                }
+                _ => Err(RouteError::RouteFailed(
+                    "Failed to reload game data".to_string(),
+                )),
+            }
+        }
+        Err(e) => Err(RouteError::RouteFailed(format!(
+            "Failed to reveal votes: {e}"
+        ))),
     }
-        };
-    Ok(Content::try_view(success_content).unwrap())
 }
 
 pub async fn sse_events_route(
     req: RouteRequest,
-    _session_manager: Arc<dyn SessionManager>,
+    session_manager: Arc<dyn SessionManager>,
 ) -> Result<Content, RouteError> {
     if !matches!(req.method, Method::Get) {
         return Err(RouteError::UnsupportedMethod);
@@ -455,10 +671,34 @@ pub async fn sse_events_route(
     // Extract game_id from path like "/api/games/uuid-here/events"
     let path_parts: Vec<&str> = req.path.split('/').collect();
     let game_id_str = path_parts.get(3).unwrap_or(&"");
-    let _game_id = Uuid::parse_str(game_id_str)?;
+    let game_id = Uuid::parse_str(game_id_str)?;
 
-    // TODO: Implement SSE stream for real-time game updates
-    // For now, return a placeholder response
+    // Send initial game state (for now, just log - real SSE implementation would go here)
+    if let Ok(Some(game)) = session_manager.get_game(game_id).await {
+        let status = match game.state {
+            GameState::Waiting => "Waiting",
+            GameState::Voting => "Voting",
+            GameState::Revealed => "Revealed",
+        };
+        update_game_status(game_id_str, status).await;
+
+        // Update vote buttons based on game state
+        let voting_active = matches!(game.state, GameState::Voting);
+        update_vote_buttons(game_id_str, voting_active).await;
+    }
+
+    if let Ok(players) = session_manager.get_game_players(game_id).await {
+        update_players_list(game_id_str, players).await;
+    }
+
+    if let Ok(votes) = session_manager.get_game_votes(game_id).await {
+        if let Ok(Some(game)) = session_manager.get_game(game_id).await {
+            let revealed = matches!(game.state, GameState::Revealed);
+            update_vote_results(game_id_str, votes, revealed).await;
+        }
+    }
+
+    // Return SSE stream setup
     let sse_content = container! {
         div {
             "SSE connection established"
@@ -486,13 +726,29 @@ pub async fn start_voting_route(
 
     match session_manager.start_voting(game_id, story).await {
         Ok(_) => {
-            let success_content = container! {
-                div padding=20 {
-                    h2 { "Voting Started!" }
-                    div { "Voting session has been started successfully" }
+            // Get updated game data and return complete page
+            match session_manager.get_game(game_id).await {
+                Ok(Some(game)) => {
+                    let players = session_manager
+                        .get_game_players(game_id)
+                        .await
+                        .unwrap_or_default();
+                    let votes = session_manager
+                        .get_game_votes(game_id)
+                        .await
+                        .unwrap_or_default();
+                    let game_content = planning_poker_ui::game_content_with_data(
+                        game_id_str.to_string(),
+                        game,
+                        players,
+                        votes,
+                    );
+                    Ok(Content::try_view(game_content).unwrap())
                 }
-            };
-            Ok(Content::try_view(success_content).unwrap())
+                _ => Err(RouteError::RouteFailed(
+                    "Failed to reload game data".to_string(),
+                )),
+            }
         }
         Err(e) => Err(RouteError::RouteFailed(format!(
             "Failed to start voting: {e}"
@@ -515,13 +771,29 @@ pub async fn reset_voting_route(
 
     match session_manager.reset_voting(game_id).await {
         Ok(_) => {
-            let success_content = container! {
-                div padding=20 {
-                    h2 { "Voting Reset!" }
-                    div { "Voting session has been reset successfully" }
+            // Get updated game data and return complete page
+            match session_manager.get_game(game_id).await {
+                Ok(Some(game)) => {
+                    let players = session_manager
+                        .get_game_players(game_id)
+                        .await
+                        .unwrap_or_default();
+                    let votes = session_manager
+                        .get_game_votes(game_id)
+                        .await
+                        .unwrap_or_default();
+                    let game_content = planning_poker_ui::game_content_with_data(
+                        game_id_str.to_string(),
+                        game,
+                        players,
+                        votes,
+                    );
+                    Ok(Content::try_view(game_content).unwrap())
                 }
-            };
-            Ok(Content::try_view(success_content).unwrap())
+                _ => Err(RouteError::RouteFailed(
+                    "Failed to reload game data".to_string(),
+                )),
+            }
         }
         Err(e) => Err(RouteError::RouteFailed(format!(
             "Failed to reset voting: {e}"
