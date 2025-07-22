@@ -5,11 +5,13 @@ use planning_poker_config::Config;
 use planning_poker_database::{create_connection, DatabaseConfig};
 use planning_poker_session::DatabaseSessionManager;
 use std::sync::Arc;
-use tracing::{info, Level};
+use tracing::info;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize tracing
-    tracing_subscriber::fmt().with_max_level(Level::INFO).init();
+    // Initialize tracing - respect RUST_LOG environment variable
+    tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .init();
 
     info!("Starting Planning Poker App");
 
