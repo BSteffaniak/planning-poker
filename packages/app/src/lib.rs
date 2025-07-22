@@ -131,31 +131,12 @@ async fn send_partial_update(target: &str, content: Containers) {
 }
 
 async fn update_game_status(_game_id: &str, status: &str) {
-    let content = container! {
-        div padding=10 background="#f0f0f0" border-radius=5 {
-            span { "Status: " }
-            span { (status) }
-        }
-    };
+    let content = planning_poker_ui::game_status_content(status);
     send_partial_update("game-status", content).await;
 }
 
 async fn update_players_list(_game_id: &str, players: Vec<Player>) {
-    let content = container! {
-        @if players.is_empty() {
-            div color="#666" { "No players yet" }
-        } @else {
-            @for player in players {
-                div padding=5 border-bottom="1px solid #eee" {
-                    span { (player.name) }
-                    @if player.is_observer {
-                        span margin-left=10 color="#666" { "(Observer)" }
-                    }
-                    span margin-left=10 color="#999" { (format!("joined {}", player.joined_at.format("%H:%M"))) }
-                }
-            }
-        }
-    };
+    let content = planning_poker_ui::players_list_content(&players);
     send_partial_update("players-list", content).await;
 }
 
@@ -198,26 +179,7 @@ async fn update_entire_voting_section(game_id: &str, voting_active: bool) {
 }
 
 async fn update_story_input(game_id: &str, voting_active: bool) {
-    let start_voting_url = format!("/api/games/{game_id}/start-voting");
-
-    let content = if voting_active {
-        container! {
-            span { "Story:" }
-            input type="text" placeholder="Enter story to vote on" margin-left=10;
-            button hx-post=(start_voting_url) margin-left=10 padding=5 background="#007bff" color="#fff" border="none" border-radius=3 disabled {
-                "Voting Active"
-            }
-        }
-    } else {
-        container! {
-            span { "Story:" }
-            input type="text" placeholder="Enter story to vote on" margin-left=10;
-            button hx-post=(start_voting_url) margin-left=10 padding=5 background="#007bff" color="#fff" border="none" border-radius=3 {
-                "Start Voting"
-            }
-        }
-    };
-
+    let content = planning_poker_ui::story_input_content(game_id, voting_active);
     send_partial_update("story-input", content).await;
 }
 
@@ -248,27 +210,7 @@ async fn update_vote_results(_game_id: &str, votes: Vec<Vote>, revealed: bool) {
         tracing::info!("Votes are hidden - will show vote count only");
     }
 
-    let content = container! {
-        @if votes.is_empty() {
-            div color="#666" { "No votes cast yet" }
-        } @else if revealed {
-            div {
-                h3 { "Vote Results:" }
-                @for vote in votes {
-                    div padding=5 border-bottom="1px solid #eee" {
-                        span { (format!("{}: {}", vote.player_name, vote.value)) }
-                        span margin-left=10 color="#999" { (format!("cast at {}", vote.cast_at.format("%H:%M:%S"))) }
-                    }
-                }
-            }
-        } @else {
-            div {
-                span { (format!("{} votes cast", votes.len())) }
-                span margin-left=10 color="#666" { "(hidden until revealed)" }
-            }
-        }
-    };
-
+    let content = planning_poker_ui::vote_results_content(&votes, revealed);
     send_partial_update("vote-results", content).await;
 }
 

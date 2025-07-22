@@ -269,6 +269,78 @@ pub fn results_section(game_id: &str, votes: &[Vote], votes_revealed: bool) -> C
         }
     }
 }
+// Partial update UI functions for SSE
+pub fn players_list_content(players: &[Player]) -> Containers {
+    container! {
+        @if players.is_empty() {
+            div color="#666" { "No players yet" }
+        } @else {
+            @for player in players {
+                div padding=5 border-bottom="1px solid #eee" {
+                    span { (player.name) }
+                    @if player.is_observer {
+                        span margin-left=10 color="#666" { "(Observer)" }
+                    }
+                    span margin-left=10 color="#999" { (format!("joined {}", player.joined_at.format("%H:%M"))) }
+                }
+            }
+        }
+    }
+}
+
+pub fn vote_results_content(votes: &[Vote], revealed: bool) -> Containers {
+    container! {
+        @if votes.is_empty() {
+            div color="#666" { "No votes cast yet" }
+        } @else if revealed {
+            div {
+                h3 { "Vote Results:" }
+                @for vote in votes {
+                    div padding=5 border-bottom="1px solid #eee" {
+                        span { (format!("{}: {}", vote.player_name, vote.value)) }
+                        span margin-left=10 color="#999" { (format!("cast at {}", vote.cast_at.format("%H:%M:%S"))) }
+                    }
+                }
+            }
+        } @else {
+            div {
+                span { (format!("{} votes cast", votes.len())) }
+                span margin-left=10 color="#666" { "(hidden until revealed)" }
+            }
+        }
+    }
+}
+
+pub fn game_status_content(status: &str) -> Containers {
+    container! {
+        div padding=10 background="#f0f0f0" border-radius=5 {
+            span { "Status: " }
+            span { (status) }
+        }
+    }
+}
+
+pub fn story_input_content(game_id: &str, voting_active: bool) -> Containers {
+    let start_voting_url = format!("/api/games/{game_id}/start-voting");
+
+    if voting_active {
+        container! {
+            span { "Story:" }
+            input type="text" placeholder="Enter story to vote on" margin-left=10;
+            button hx-post=(start_voting_url) margin-left=10 padding=5 background="#007bff" color="#fff" border="none" border-radius=3 disabled {
+                "Voting Active"
+            }
+        }
+    } else {
+        container! {
+            span { "Story:" }
+            input type="text" placeholder="Enter story to vote on" margin-left=10;
+            button hx-post=(start_voting_url) margin-left=10 padding=5 background="#007bff" color="#fff" border="none" border-radius=3 {
+                "Start Voting"
+            }
+        }
+    }
+}
 
 pub fn game_page_with_data(
     game_id: String,
