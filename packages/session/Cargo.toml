@@ -1,22 +1,23 @@
 [package]
 authors     = { workspace = true }
+categories  = ["web-programming", "database"]
 description = "Session management and persistence"
 edition     = { workspace = true }
+keywords    = ["session", "persistence", "database", "planning-poker"]
 license     = { workspace = true }
 name        = "planning_poker_session"
+readme      = "../../README.md"
 repository  = { workspace = true }
 version     = "0.1.0"
 
 [dependencies]
-planning_poker_models = { workspace = true }
+anyhow                  = { workspace = true }
+async-trait             = { workspace = true }
+chrono                  = { workspace = true }
 planning_poker_database = { workspace = true }
-planning_poker_schema = { workspace = true, features = ["sqlite"] }
-switchy = { workspace = true, features = ["database"] }
-anyhow = { workspace = true }
-async-trait = { workspace = true }
-chrono = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-thiserror = { workspace = true }
-tracing = { workspace = true }
-uuid = { workspace = true }
+planning_poker_models   = { workspace = true }
+planning_poker_schema   = { workspace = true, features = ["sqlite"] }
+switchy                 = { workspace = true, features = ["database"] }
+tracing                 = { workspace = true }
+uuid                    = { workspace = true }
+

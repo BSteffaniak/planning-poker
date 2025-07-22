@@ -1,24 +1,31 @@
 [package]
 authors     = { workspace = true }
+categories  = ["gui", "web-programming"]
 description = "Shared UI components for planning poker"
 edition     = { workspace = true }
+keywords    = ["ui", "components", "gui", "web", "planning-poker"]
 license     = { workspace = true }
 name        = "planning_poker_ui"
+readme      = "../../README.md"
 repository  = { workspace = true }
 version     = "0.1.0"
 
 [dependencies]
-planning_poker_models = { workspace = true }
-hyperchad = { workspace = true, features = ["app", "state", "template", "transformer", "color", "router", "renderer"] }
 anyhow = { workspace = true }
-eframe = { workspace = true, optional = true }
-egui = { workspace = true, optional = true }
+hyperchad = { workspace = true, features = [
+    "app",
+    "color",
+    "renderer",
+    "router",
+    "state",
+    "template",
+    "transformer",
+] }
+planning_poker_models = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true }
-tokio = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true }
 
 [features]
 default = []
-desktop = ["dep:eframe", "dep:egui"]
+

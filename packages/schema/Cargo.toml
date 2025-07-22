@@ -1,9 +1,12 @@
 [package]
 authors     = { workspace = true }
+categories  = ["database"]
 description = "Database schema and migrations for planning poker"
 edition     = { workspace = true }
+keywords    = ["schema", "migrations", "database", "sql"]
 license     = { workspace = true }
 name        = "planning_poker_schema"
+readme      = "../../README.md"
 repository  = { workspace = true }
 version     = "0.1.0"
 

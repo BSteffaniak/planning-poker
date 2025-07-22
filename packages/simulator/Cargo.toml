@@ -1,0 +1,56 @@
+[package]
+authors     = ["Planning Poker Contributors"]
+categories  = ["development-tools::testing", "simulation"]
+description = "Planning Poker Simulator package"
+edition     = "2021"
+keywords    = ["deterministic", "harness", "planning-poker", "simulator", "test"]
+license     = "MPL-2.0"
+name        = "planning_poker_simulator"
+readme      = "README.md"
+repository  = "https://github.com/planning-poker/planning-poker"
+version     = "0.1.0"
+
+[dependencies]
+# Internal Planning Poker packages
+planning_poker_database = { workspace = true }
+planning_poker_session  = { workspace = true }
+
+# Simvar for deterministic simulation
+simvar = { workspace = true, features = [
+    "async",
+    "fs",
+    "pretty_env_logger",
+    "random",
+    "tcp",
+    "time",
+    "tui",
+] }
+
+# Switchy for deterministic async operations
+switchy = { workspace = true, features = [
+    "async",
+    "async-io",
+    "async-macros",
+    "async-net",
+    "async-rt-multi-thread",
+    "async-sync",
+    "async-tokio",
+    "async-util",
+    "fs",
+    "fs-std",
+    "tcp",
+    "tcp-tokio",
+    "time",
+    "time-std",
+] }
+
+# Common dependencies
+log        = { workspace = true }
+serde_json = { workspace = true }
+thiserror  = { workspace = true }
+uuid       = { workspace = true }
+
+[features]
+default = []
+
+fail-on-warnings = []

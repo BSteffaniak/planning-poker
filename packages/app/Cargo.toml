@@ -1,9 +1,12 @@
 [package]
 authors     = { workspace = true }
+categories  = ["games", "web-programming", "gui"]
 description = "Cross-platform planning poker application using HyperChad"
 edition     = { workspace = true }
+keywords    = ["planning-poker", "scrum", "agile", "estimation", "gui"]
 license     = { workspace = true }
 name        = "planning_poker_app"
+readme      = "../../README.md"
 repository  = { workspace = true }
 version     = "0.1.0"
 
@@ -14,8 +17,6 @@ path = "src/main.rs"
 [dependencies]
 anyhow = { workspace = true }
 chrono = { workspace = true }
-eframe = { workspace = true, optional = true }
-egui = { workspace = true, optional = true }
 hyperchad = { workspace = true, features = [
     "actions",
     "actions-logic",
@@ -58,12 +59,7 @@ tokio = { workspace = true, features = ["macros", "rt"] }
 
 [features]
 default = ["desktop"]
-desktop = [
-    "dep:eframe",
-    "dep:egui",
-    "hyperchad/renderer-egui",
-    "planning_poker_ui/desktop",
-]
+desktop = ["hyperchad/renderer-egui"]
 vanilla-js = [
     "hyperchad/renderer-vanilla-js",
     "hyperchad/renderer-vanilla-js-plugin-actions",

@@ -7,6 +7,7 @@ members = [
     "packages/poker",
     "packages/schema",
     "packages/session",
+    "packages/simulator",
     "packages/ui",
 ]
 
@@ -53,14 +54,15 @@ repository = "https://github.com/planning-poker/planning-poker"
 
 [workspace.dependencies]
 # Internal Planning Poker packages
-planning_poker_app      = { version = "0.1.0", default-features = false, path = "packages/app" }
-planning_poker_config   = { version = "0.1.0", default-features = false, path = "packages/config" }
-planning_poker_database = { version = "0.1.0", default-features = false, path = "packages/database" }
-planning_poker_models   = { version = "0.1.0", default-features = false, path = "packages/models" }
-planning_poker_poker    = { version = "0.1.0", default-features = false, path = "packages/poker" }
-planning_poker_schema   = { version = "0.1.0", default-features = false, path = "packages/schema" }
-planning_poker_session  = { version = "0.1.0", default-features = false, path = "packages/session" }
-planning_poker_ui       = { version = "0.1.0", default-features = false, path = "packages/ui" }
+planning_poker_app       = { version = "0.1.0", default-features = false, path = "packages/app" }
+planning_poker_config    = { version = "0.1.0", default-features = false, path = "packages/config" }
+planning_poker_database  = { version = "0.1.0", default-features = false, path = "packages/database" }
+planning_poker_models    = { version = "0.1.0", default-features = false, path = "packages/models" }
+planning_poker_poker     = { version = "0.1.0", default-features = false, path = "packages/poker" }
+planning_poker_schema    = { version = "0.1.0", default-features = false, path = "packages/schema" }
+planning_poker_session   = { version = "0.1.0", default-features = false, path = "packages/session" }
+planning_poker_simulator = { version = "0.1.0", default-features = false, path = "packages/simulator" }
+planning_poker_ui        = { version = "0.1.0", default-features = false, path = "packages/ui" }
 
 # External dependencies from MoosicBox workspace
 # HyperChad UI Framework
@@ -68,6 +70,9 @@ hyperchad = { version = "0.1.0", default-features = false, path = "../MoosicBox/
 
 # Switchy Runtime
 switchy = { version = "0.1.4", default-features = false, path = "../MoosicBox/packages/switchy" }
+
+# Simvar for deterministic simulation testing
+simvar = { version = "0.1.0", default-features = false, path = "../MoosicBox/packages/simvar" }
 
 # Common dependencies
 actix-web = "4.11.0"

@@ -1,19 +1,17 @@
 [package]
 authors     = { workspace = true }
+categories  = ["games", "algorithms"]
 description = "Planning poker game logic and state management"
 edition     = { workspace = true }
+keywords    = ["planning-poker", "game-logic", "scrum", "agile", "estimation"]
 license     = { workspace = true }
 name        = "planning_poker_poker"
+readme      = "../../README.md"
 repository  = { workspace = true }
 version     = "0.1.0"
 
 [dependencies]
+anyhow                = { workspace = true }
 planning_poker_models = { workspace = true }
-anyhow = { workspace = true }
-async-trait = { workspace = true }
-chrono = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-thiserror = { workspace = true }
-tracing = { workspace = true }
-uuid = { workspace = true }
+uuid                  = { workspace = true }
+

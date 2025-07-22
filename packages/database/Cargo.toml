@@ -1,9 +1,12 @@
 [package]
 authors     = { workspace = true }
+categories  = ["database"]
 description = "Database layer using switchy_database for planning poker"
 edition     = { workspace = true }
+keywords    = ["database", "sqlite", "postgres", "orm"]
 license     = { workspace = true }
 name        = "planning_poker_database"
+readme      = "../../README.md"
 repository  = { workspace = true }
 version     = "0.1.0"
 
