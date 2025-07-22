@@ -67,56 +67,80 @@ impl PlanningPokerApp {
 }
 
 pub fn create_router() -> Router {
-    Router::new().with_route_result("/", |_request: RouteRequest| {
-        let content = home_page();
-        let container = content.into_iter().next().unwrap_or_default();
-        async move {
-            Ok::<View, anyhow::Error>(View {
-                immediate: container,
-                future: None,
-            })
-        }
-    })
+    Router::new()
+        .with_route_result("/", |_request: RouteRequest| {
+            let content = app_layout();
+            let container = content.into_iter().next().unwrap_or_default();
+            async move {
+                Ok::<View, anyhow::Error>(View {
+                    immediate: container,
+                    future: None,
+                })
+            }
+        })
+        .with_route_result("/home", |_request: RouteRequest| {
+            let content = home_content();
+            let container = content.into_iter().next().unwrap_or_default();
+            async move {
+                Ok::<View, anyhow::Error>(View {
+                    immediate: container,
+                    future: None,
+                })
+            }
+        })
 }
 
 #[must_use]
-pub fn home_page() -> Containers {
+pub fn page_layout(content: Containers) -> Containers {
+    tracing::info!("page_layout called, wrapping content with main-content div");
     container! {
-        div id="main-content" width=100% height=100% padding=20 {
-            h1 { "Planning Poker" }
-            div { "Welcome to Planning Poker!" }
+        div id="main-content" width=100% height=100% padding=20 overflow-y="auto" {
+            (content)
+        }
+    }
+}
 
-            div margin-top=20 {
-                h2 { "Join a Game" }
-                form hx-post="/join-game" {
-                    div margin-bottom=10 {
-                        span { "Game ID:" }
-                        input type="text" name="game-id" placeholder="Enter game ID" margin-left=10 required;
-                    }
-                    div margin-bottom=10 {
-                        span { "Your Name:" }
-                        input type="text" name="player-name" placeholder="Enter your name" margin-left=10 required;
-                    }
-                    button type="submit" margin-top=10 padding=10 background="#007bff" color="#fff" border="none" border-radius=5 {
-                        "Join Game"
-                    }
+#[must_use]
+pub fn app_layout() -> Containers {
+    page_layout(home_content())
+}
+
+#[must_use]
+pub fn home_content() -> Containers {
+    container! {
+        h1 { "Planning Poker" }
+        div { "Welcome to Planning Poker!" }
+
+        div margin-top=20 {
+            h2 { "Join a Game" }
+            form hx-post="/join-game" {
+                div margin-bottom=10 {
+                    span { "Game ID:" }
+                    input type="text" name="game-id" placeholder="Enter game ID" margin-left=10 required;
+                }
+                div margin-bottom=10 {
+                    span { "Your Name:" }
+                    input type="text" name="player-name" placeholder="Enter your name" margin-left=10 required;
+                }
+                button type="submit" margin-top=10 padding=10 background="#007bff" color="#fff" border="none" border-radius=5 {
+                    "Join Game"
                 }
             }
+        }
 
-            div margin-top=30 {
-                h2 { "Create a New Game" }
-                form hx-post="/api/games" {
-                    div margin-bottom=10 {
-                        span { "Game Name:" }
-                        input type="text" name="name" placeholder="Enter game name" margin-left=10 required;
-                    }
-                    div margin-bottom=10 {
-                        span { "Voting System:" }
-                        input type="text" name="voting_system" value="fibonacci" placeholder="fibonacci, tshirt, or powers_of_2" margin-left=10 required;
-                    }
-                    button type="submit" margin-top=10 padding=10 background="#28a745" color="#fff" border="none" border-radius=5 {
-                        "Create Game"
-                    }
+        div margin-top=30 {
+            h2 { "Create a New Game" }
+            form hx-post="/api/games" {
+                div margin-bottom=10 {
+                    span { "Game Name:" }
+                    input type="text" name="name" placeholder="Enter game name" margin-left=10 required;
+                }
+                div margin-bottom=10 {
+                    span { "Voting System:" }
+                    input type="text" name="voting_system" value="fibonacci" placeholder="fibonacci, tshirt, or powers_of_2" margin-left=10 required;
+                }
+                button type="submit" margin-top=10 padding=10 background="#28a745" color="#fff" border="none" border-radius=5 {
+                    "Create Game"
                 }
             }
         }
@@ -252,33 +276,9 @@ pub fn game_page_with_data(
     players: Vec<Player>,
     votes: Vec<Vote>,
 ) -> Containers {
-    let game_id_display = format!("Game ID: {game_id}");
-    let status_text = match game.state {
-        GameState::Waiting => "Waiting for players",
-        GameState::Voting => "Voting in progress",
-        GameState::Revealed => "Votes revealed",
-    };
-    let voting_active = matches!(game.state, GameState::Voting);
-    let votes_revealed = matches!(game.state, GameState::Revealed);
-
-    container! {
-        div id="main-content" width=100% height=100% padding=20 {
-            h1 { "Planning Poker Game" }
-            div { (game_id_display) }
-            div { (format!("Game: {}", game.name)) }
-
-            (game_status_section(&status_text))
-            (players_section(&players))
-            (voting_section(&game_id, voting_active))
-            (results_section(&game_id, &votes, votes_revealed))
-
-            div margin-top=30 {
-                anchor href="/" {
-                    "← Back to Home"
-                }
-            }
-        }
-    }
+    tracing::info!("game_page_with_data called, wrapping with page_layout");
+    let content = game_content_with_data(game_id, game, players, votes);
+    page_layout(content)
 }
 
 pub fn game_content_with_data(

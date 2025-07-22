@@ -325,22 +325,22 @@ pub async fn join_game_route(
             }
 
             // Return success message with redirect to game page
-            let success_content = container! {
-                div padding=20 {
-                    h2 { "Success!" }
-                    div {
-                        (format!("Successfully joined game {} as {}", form_data.game_id, form_data.player_name))
+            tracing::info!("Join game success: game_id = {}", form_data.game_id);
+            let content = container! {
+                h2 { "Success!" }
+                div {
+                    (format!("Successfully joined game {} as {}", form_data.game_id, form_data.player_name))
+                }
+                div margin-top=20 {
+                    anchor href=(format!("/game/{}", form_data.game_id)) margin=10 padding=10 background="#007bff" color="#fff" text-decoration="none" border-radius=5 {
+                        "Go to Game"
                     }
-                    div margin-top=20 {
-                        button hx-get=(format!("/game/{}", form_data.game_id)) hx-swap="#main-content" margin=10 padding=10 background="#007bff" color="#fff" border="none" border-radius=5 {
-                            "Go to Game"
-                        }
-                        button hx-get="/" hx-swap="#main-content" margin=10 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 {
-                            "Back to Home"
-                        }
+                    anchor href="/" margin=10 padding=10 background="#6c757d" color="#fff" text-decoration="none" border-radius=5 {
+                        "Back to Home"
                     }
                 }
             };
+            let success_content = planning_poker_ui::page_layout(content);
 
             Ok(Content::try_view(success_content).unwrap())
         }
@@ -380,25 +380,25 @@ pub async fn create_game_route(
         .await
     {
         Ok(game) => {
-            let success_content = container! {
-                div padding=20 {
-                    h2 { "Game Created!" }
-                    div {
-                        (format!("Created game: {}", game.name))
+            tracing::info!("Create game success: game_id = {}", game.id);
+            let content = container! {
+                h2 { "Game Created!" }
+                div {
+                    (format!("Created game: {}", game.name))
+                }
+                div {
+                    (format!("Game ID: {}", game.id))
+                }
+                div margin-top=20 {
+                    anchor href=(format!("/game/{}", game.id)) margin=10 padding=10 background="#007bff" color="#fff" text-decoration="none" border-radius=5 {
+                        "Go to Game"
                     }
-                    div {
-                        (format!("Game ID: {}", game.id))
-                    }
-                    div margin-top=20 {
-                        button hx-get=(format!("/game/{}", game.id)) hx-swap="#main-content" margin=10 padding=10 background="#007bff" color="#fff" border="none" border-radius=5 {
-                            "Go to Game"
-                        }
-                        button hx-get="/" hx-swap="#main-content" margin=10 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 {
-                            "Back to Home"
-                        }
+                    anchor href="/" margin=10 padding=10 background="#6c757d" color="#fff" text-decoration="none" border-radius=5 {
+                        "Back to Home"
                     }
                 }
             };
+            let success_content = planning_poker_ui::page_layout(content);
             Ok(Content::try_view(success_content).unwrap())
         }
         Err(e) => Err(RouteError::RouteFailed(format!(
@@ -411,12 +411,19 @@ pub async fn game_page_route(
     req: RouteRequest,
     session_manager: Arc<dyn SessionManager>,
 ) -> Result<Content, RouteError> {
+    tracing::info!("game_page_route called with path: {}", req.path);
+
     if !matches!(req.method, Method::Get) {
         return Err(RouteError::UnsupportedMethod);
     }
 
     // Extract game_id from path like "/game/uuid-here"
     let game_id_str = req.path.strip_prefix("/game/").unwrap_or("");
+    tracing::info!(
+        "Game page route: received path = {}, extracted game_id_str = {}",
+        req.path,
+        game_id_str
+    );
     let game_id = Uuid::parse_str(game_id_str)?;
 
     match session_manager.get_game(game_id).await {
@@ -471,28 +478,27 @@ pub async fn get_game_route(
                 None
             };
 
-            let game_content = container! {
-                div padding=20 {
-                    h2 { (format!("Game: {}", game.name)) }
-                    div { (format!("State: {:?}", game.state)) }
+            let content = container! {
+                h2 { (format!("Game: {}", game.name)) }
+                div { (format!("State: {:?}", game.state)) }
 
-                    div margin-top=20 {
-                        h3 { "Players" }
-                        @for player in players {
-                            div { (format!("{} (joined: {})", player.name, player.joined_at.format("%H:%M"))) }
-                        }
+                div margin-top=20 {
+                    h3 { "Players" }
+                    @for player in players {
+                        div { (format!("{} (joined: {})", player.name, player.joined_at.format("%H:%M"))) }
                     }
+                }
 
-                    @if let Some(votes) = votes {
-                        div margin-top=20 {
-                            h3 { "Votes" }
-                            @for vote in votes {
-                                div { (format!("Player {}: {}", vote.player_id, vote.value)) }
-                            }
+                @if let Some(votes) = votes {
+                    div margin-top=20 {
+                        h3 { "Votes" }
+                        @for vote in votes {
+                            div { (format!("Player {}: {}", vote.player_id, vote.value)) }
                         }
                     }
                 }
             };
+            let game_content = planning_poker_ui::page_layout(content);
             Ok(Content::try_view(game_content).unwrap())
         }
         Ok(None) => Err(RouteError::RouteFailed("Game not found".to_string())),
@@ -597,7 +603,7 @@ pub async fn vote_route(
                         .get_game_votes(game_id)
                         .await
                         .unwrap_or_default();
-                    let game_content = planning_poker_ui::game_content_with_data(
+                    let game_content = planning_poker_ui::game_page_with_data(
                         game_id_str.to_string(),
                         game,
                         players,
@@ -641,7 +647,7 @@ pub async fn reveal_votes_route(
                         .get_game_votes(game_id)
                         .await
                         .unwrap_or_default();
-                    let game_content = planning_poker_ui::game_content_with_data(
+                    let game_content = planning_poker_ui::game_page_with_data(
                         game_id_str.to_string(),
                         game,
                         players,
@@ -737,7 +743,7 @@ pub async fn start_voting_route(
                         .get_game_votes(game_id)
                         .await
                         .unwrap_or_default();
-                    let game_content = planning_poker_ui::game_content_with_data(
+                    let game_content = planning_poker_ui::game_page_with_data(
                         game_id_str.to_string(),
                         game,
                         players,
@@ -782,7 +788,7 @@ pub async fn reset_voting_route(
                         .get_game_votes(game_id)
                         .await
                         .unwrap_or_default();
-                    let game_content = planning_poker_ui::game_content_with_data(
+                    let game_content = planning_poker_ui::game_page_with_data(
                         game_id_str.to_string(),
                         game,
                         players,
