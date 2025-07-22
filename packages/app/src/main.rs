@@ -36,6 +36,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let db = runtime.block_on(async { create_connection(db_config).await })?;
     let session_manager = Arc::new(DatabaseSessionManager::new(db));
 
+    // Initialize database schema
+    {
+        let session_manager_clone = session_manager.clone();
+        runtime.block_on(async move { session_manager_clone.init_schema().await })?;
+    }
+
     // Create router with planning poker routes and database access
     let router = planning_poker_app::create_app_router(session_manager);
 

@@ -3825,6 +3825,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e8a5a9a0ff0086c7a148acb942baaabeadf9504d10400b5a05645853729b9cd2"
 
 [[package]]
+name = "include_dir"
+version = "0.7.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "923d117408f1e49d914f1a379a309cffe4f18c05cf4e3d12e613a15fc81bd0dd"
+dependencies = [
+ "include_dir_macros",
+]
+
+[[package]]
+name = "include_dir_macros"
+version = "0.7.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7cab85a7ed0bd5f0e76d93846e0147172bed2e2d3f859bcc33a8d9699cad1a75"
+dependencies = [
+ "proc-macro2",
+ "quote",
+]
+
+[[package]]
 name = "indexmap"
 version = "2.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5266,6 +5285,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "planning_poker_schema"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "include_dir",
+ "planning_poker_database",
+ "switchy",
+ "thiserror 2.0.12",
+ "tracing",
+]
+
+[[package]]
 name = "planning_poker_session"
 version = "0.1.0"
 dependencies = [
@@ -5274,8 +5305,10 @@ dependencies = [
  "chrono",
  "planning_poker_database",
  "planning_poker_models",
+ "planning_poker_schema",
  "serde",
  "serde_json",
+ "switchy",
  "thiserror 2.0.12",
  "tracing",
  "uuid",
@@ -6620,7 +6653,7 @@ dependencies = [
  "cfg-if",
  "libc",
  "psm",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

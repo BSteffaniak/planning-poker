@@ -1,22 +1,21 @@
 [package]
 authors     = { workspace = true }
-description = "Session management and persistence"
+description = "Database schema and migrations for planning poker"
 edition     = { workspace = true }
 license     = { workspace = true }
-name        = "planning_poker_session"
+name        = "planning_poker_schema"
 repository  = { workspace = true }
 version     = "0.1.0"
 
 [dependencies]
-planning_poker_models = { workspace = true }
 planning_poker_database = { workspace = true }
-planning_poker_schema = { workspace = true, features = ["sqlite"] }
 switchy = { workspace = true, features = ["database"] }
 anyhow = { workspace = true }
-async-trait = { workspace = true }
-chrono = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
+include_dir = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
-uuid = { workspace = true }
+
+[features]
+default = ["sqlite"]
+sqlite = ["planning_poker_database/sqlite"]
+postgres = ["planning_poker_database/postgres"]

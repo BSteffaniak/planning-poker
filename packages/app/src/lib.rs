@@ -509,6 +509,7 @@ mod tests {
 
         let db = create_connection(db_config).await.unwrap();
         let session_manager = Arc::new(DatabaseSessionManager::new(db));
+        session_manager.init_schema().await.unwrap();
 
         // Test that the form parsing works
         let result = join_game_route(req, session_manager).await;
