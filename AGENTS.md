@@ -40,6 +40,12 @@ cargo clippy --workspace --all-targets --all-features -- -D warnings  # Lint
 - Use `#[derive(Debug, Clone, Serialize, Deserialize)]` for data models
 - Handle `Option` and `Result` explicitly, avoid `.unwrap()` except in tests
 
+## Frontend Technology
+
+- **Uses hyperchad, NOT htmx**: This project uses a custom library called "hyperchad" that resembles htmx but is not htmx
+- **Limited feature set**: hyperchad does not have all the features of htmx - check existing code patterns before assuming htmx functionality exists
+- **Custom implementation**: When working with frontend interactions, refer to existing hyperchad usage patterns in the codebase
+
 ## Architecture
 
 Modular workspace: models (pure data) → poker (business logic) → session/database → websocket/api → server/app/ui
