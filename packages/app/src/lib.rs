@@ -135,6 +135,10 @@ pub fn create_app_router(session_manager: Arc<dyn SessionManager>) -> Router {
                             vote_route(req, session_manager).await
                         } else if req.path.ends_with("/reveal") {
                             reveal_votes_route(req, session_manager).await
+                        } else if req.path.ends_with("/start-voting") {
+                            start_voting_route(req, session_manager).await
+                        } else if req.path.ends_with("/reset") {
+                            reset_voting_route(req, session_manager).await
                         } else if req.path.ends_with("/events") {
                             sse_events_route(req, session_manager).await
                         } else {
@@ -452,6 +456,68 @@ pub async fn sse_events_route(
         }
     };
     Ok(Content::try_view(sse_content).unwrap())
+}
+
+pub async fn start_voting_route(
+    req: RouteRequest,
+    session_manager: Arc<dyn SessionManager>,
+) -> Result<Content, RouteError> {
+    if !matches!(req.method, Method::Post) {
+        return Err(RouteError::UnsupportedMethod);
+    }
+
+    // Extract game_id from path like "/api/games/uuid-here/start-voting"
+    let path_parts: Vec<&str> = req.path.split('/').collect();
+    let game_id_str = path_parts.get(3).unwrap_or(&"");
+    let game_id = Uuid::parse_str(game_id_str)?;
+
+    // TODO: Parse story from request body if needed
+    // For now, use a default story
+    let story = "Current Story".to_string();
+
+    match session_manager.start_voting(game_id, story).await {
+        Ok(_) => {
+            let success_content = container! {
+                div padding=20 {
+                    h2 { "Voting Started!" }
+                    div { "Voting session has been started successfully" }
+                }
+            };
+            Ok(Content::try_view(success_content).unwrap())
+        }
+        Err(e) => Err(RouteError::RouteFailed(format!(
+            "Failed to start voting: {e}"
+        ))),
+    }
+}
+
+pub async fn reset_voting_route(
+    req: RouteRequest,
+    session_manager: Arc<dyn SessionManager>,
+) -> Result<Content, RouteError> {
+    if !matches!(req.method, Method::Post) {
+        return Err(RouteError::UnsupportedMethod);
+    }
+
+    // Extract game_id from path like "/api/games/uuid-here/reset"
+    let path_parts: Vec<&str> = req.path.split('/').collect();
+    let game_id_str = path_parts.get(3).unwrap_or(&"");
+    let game_id = Uuid::parse_str(game_id_str)?;
+
+    match session_manager.reset_voting(game_id).await {
+        Ok(_) => {
+            let success_content = container! {
+                div padding=20 {
+                    h2 { "Voting Reset!" }
+                    div { "Voting session has been reset successfully" }
+                }
+            };
+            Ok(Content::try_view(success_content).unwrap())
+        }
+        Err(e) => Err(RouteError::RouteFailed(format!(
+            "Failed to reset voting: {e}"
+        ))),
+    }
 }
 
 #[cfg(test)]

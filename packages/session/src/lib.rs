@@ -26,6 +26,9 @@ pub trait SessionManager: Send + Sync {
     async fn get_game_votes(&self, game_id: Uuid) -> Result<Vec<Vote>>;
     async fn clear_game_votes(&self, game_id: Uuid) -> Result<()>;
 
+    async fn start_voting(&self, game_id: Uuid, story: String) -> Result<()>;
+    async fn reset_voting(&self, game_id: Uuid) -> Result<()>;
+
     async fn create_session(&self, session: Session) -> Result<()>;
     async fn get_session(&self, connection_id: &str) -> Result<Option<Session>>;
     async fn update_session_last_seen(&self, connection_id: &str) -> Result<()>;
@@ -292,6 +295,47 @@ impl SessionManager for DatabaseSessionManager {
     async fn cleanup_expired_sessions(&self) -> Result<()> {
         // TODO: Implement cleanup logic
         tracing::info!("Cleaning up expired sessions");
+        Ok(())
+    }
+
+    async fn start_voting(&self, game_id: Uuid, story: String) -> Result<()> {
+        tracing::info!("Starting voting for game {} with story: {}", game_id, story);
+
+        let now = Utc::now();
+        self.db
+            .update("games")
+            .value("state", DatabaseValue::String("Voting".to_string()))
+            .value("current_story", DatabaseValue::String(story))
+            .value("updated_at", DatabaseValue::String(now.to_rfc3339()))
+            .where_eq("id", DatabaseValue::String(game_id.to_string()))
+            .execute(&**self.db)
+            .await?;
+
+        Ok(())
+    }
+
+    async fn reset_voting(&self, game_id: Uuid) -> Result<()> {
+        tracing::info!("Resetting voting for game {}", game_id);
+
+        let now = Utc::now();
+
+        // Clear all votes for this game
+        self.db
+            .delete("votes")
+            .where_eq("game_id", DatabaseValue::String(game_id.to_string()))
+            .execute(&**self.db)
+            .await?;
+
+        // Reset game state to Waiting
+        self.db
+            .update("games")
+            .value("state", DatabaseValue::String("Waiting".to_string()))
+            .value("current_story", DatabaseValue::Null)
+            .value("updated_at", DatabaseValue::String(now.to_rfc3339()))
+            .where_eq("id", DatabaseValue::String(game_id.to_string()))
+            .execute(&**self.db)
+            .await?;
+
         Ok(())
     }
 }
