@@ -139,6 +139,7 @@ fn rows_to_players(rows: Vec<Row>) -> Result<Vec<Player>> {
 fn row_to_vote(row: &Row) -> Result<Vote> {
     Ok(Vote {
         player_id: Uuid::parse_str(&get_string_from_row(row, "player_id")?)?,
+        player_name: get_string_from_row(row, "player_name")?,
         value: get_string_from_row(row, "value")?,
         cast_at: DateTime::parse_from_rfc3339(&get_string_from_row(row, "cast_at")?)?
             .with_timezone(&Utc),
@@ -315,6 +316,7 @@ impl SessionManager for DatabaseSessionManager {
                 "player_id",
                 DatabaseValue::String(vote.player_id.to_string()),
             )
+            .value("player_name", DatabaseValue::String(vote.player_name))
             .value("value", DatabaseValue::String(vote.value))
             .value("cast_at", DatabaseValue::String(vote.cast_at.to_rfc3339()))
             .execute(&**self.db)

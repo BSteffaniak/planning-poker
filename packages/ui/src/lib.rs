@@ -244,7 +244,7 @@ pub fn results_section(game_id: &str, votes: &[Vote], votes_revealed: bool) -> C
                         h3 { "Vote Results:" }
                         @for vote in votes {
                             div padding=5 border-bottom="1px solid #eee" {
-                                span { (format!("Player {}: {}", vote.player_id, vote.value)) }
+                                span { (format!("{}: {}", vote.player_name, vote.value)) }
                                 span margin-left=10 color="#999" { (format!("cast at {}", vote.cast_at.format("%H:%M:%S"))) }
                             }
                         }

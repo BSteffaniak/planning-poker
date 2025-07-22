@@ -231,9 +231,10 @@ async fn update_vote_results(_game_id: &str, votes: Vec<Vote>, revealed: bool) {
     // Log individual votes for debugging
     for (i, vote) in votes.iter().enumerate() {
         tracing::info!(
-            "Vote {}: player_id={}, value={}, cast_at={}",
+            "Vote {}: player_id={}, player_name={}, value={}, cast_at={}",
             i,
             vote.player_id,
+            vote.player_name,
             vote.value,
             vote.cast_at
         );
@@ -255,7 +256,7 @@ async fn update_vote_results(_game_id: &str, votes: Vec<Vote>, revealed: bool) {
                 h3 { "Vote Results:" }
                 @for vote in votes {
                     div padding=5 border-bottom="1px solid #eee" {
-                        span { (format!("Player {}: {}", vote.player_id, vote.value)) }
+                        span { (format!("{}: {}", vote.player_name, vote.value)) }
                         span margin-left=10 color="#999" { (format!("cast at {}", vote.cast_at.format("%H:%M:%S"))) }
                     }
                 }
@@ -682,14 +683,15 @@ pub async fn vote_route(
         .get_game_players(game_id)
         .await
         .unwrap_or_default();
-    let player_id = if let Some(first_player) = players.first() {
-        first_player.id
+    let (player_id, player_name) = if let Some(first_player) = players.first() {
+        (first_player.id, first_player.name.clone())
     } else {
         return Err(RouteError::RouteFailed("No players in game".to_string()));
     };
 
     let vote = Vote {
         player_id,
+        player_name,
         value: form_data.vote,
         cast_at: Utc::now(),
     };

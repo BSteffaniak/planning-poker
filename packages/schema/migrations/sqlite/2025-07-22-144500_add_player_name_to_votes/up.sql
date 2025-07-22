@@ -1,0 +1,1 @@
+ALTER TABLE votes ADD COLUMN player_name TEXT NOT NULL DEFAULT '';

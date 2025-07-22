@@ -32,6 +32,7 @@ pub struct Player {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Vote {
     pub player_id: Uuid,
+    pub player_name: String,
     pub value: String,
     pub cast_at: DateTime<Utc>,
 }
