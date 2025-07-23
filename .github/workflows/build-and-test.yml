@@ -42,12 +42,20 @@ jobs:
 
         steps:
             - uses: actions/checkout@v4
+              with:
+                  path: planning-poker
+
+            - uses: actions/checkout@v4
+              with:
+                  repository: MoosicBox/MoosicBox
+                  path: MoosicBox
 
             - uses: dtolnay/rust-toolchain@stable
 
             - name: cargo-deny check ${{ matrix.checks }}
               uses: EmbarkStudios/cargo-deny-action@v2
               with:
+                  manifest-path: planning-poker/Cargo.toml
                   command: check ${{ matrix.checks }}
                   arguments: --all-features
 
@@ -59,7 +67,13 @@ jobs:
         steps:
             - uses: actions/checkout@v4
               with:
+                  path: planning-poker
                   fetch-depth: 0
+
+            - uses: actions/checkout@v4
+              with:
+                  repository: MoosicBox/MoosicBox
+                  path: MoosicBox
 
             - uses: dtolnay/rust-toolchain@stable
               with:
@@ -82,6 +96,7 @@ jobs:
                   verify-command: --version
 
             - name: Get dependencies
+              working-directory: planning-poker
               id: dependencies
               run: |
                   DEPENDENCIES="$(~/.cargo/bin/clippier dependencies . --os ubuntu)"
@@ -92,6 +107,7 @@ jobs:
                   echo 'EOF' >> $GITHUB_OUTPUT
 
             - name: Get environment
+              working-directory: planning-poker
               id: environment
               run: |
                   ENVIRONMENT="$(~/.cargo/bin/clippier environment . --os ubuntu -o json | jq -cr 'join(" ")')"
@@ -102,6 +118,7 @@ jobs:
                   echo 'EOF' >> $GITHUB_OUTPUT
 
             - name: Get ci_steps
+              working-directory: planning-poker
               id: ci_steps
               run: |
                   CI_STEPS="$(~/.cargo/bin/clippier ci-steps . --os ubuntu -o json | jq -cr 'join(" ")')"
@@ -117,20 +134,24 @@ jobs:
                   cmake-version: "3.x"
 
             - name: Setup CI
+              working-directory: planning-poker
               if: ${{ steps.ci_steps.outputs.ci_steps }}
               run: ${{ steps.ci_steps.outputs.ci_steps }}
 
             - name: Install dependencies
+              working-directory: planning-poker
               if: ${{ steps.dependencies.outputs.dependencies }}
               shell: bash
               run: ${{ steps.dependencies.outputs.dependencies }}
 
             - name: cargo llvm-cov
+              working-directory: planning-poker
               run: ${{ steps.environment.outputs.environment }} cargo +nightly llvm-cov --locked --workspace --lcov --output-path lcov.info
 
             - name: Upload coverage reports to Codecov
               uses: codecov/codecov-action@v5
               with:
+                  working-directory: planning-poker
                   token: ${{ secrets.CODECOV_TOKEN }}
                   slug: MoosicBox/MoosicBox
                   fail_ci_if_error: true
@@ -148,7 +169,13 @@ jobs:
         steps:
             - uses: actions/checkout@v4
               with:
+                  path: planning-poker
                   fetch-depth: 0
+
+            - uses: actions/checkout@v4
+              with:
+                  repository: MoosicBox/MoosicBox
+                  path: MoosicBox
 
             - uses: dtolnay/rust-toolchain@stable
 
@@ -165,6 +192,7 @@ jobs:
                   verify-command: --version
 
             - name: Analyze changes and generate matrix
+              working-directory: planning-poker
               id: analyze-changes
               run: |
                   echo "🔍 Determining git comparison range and analyzing changes..."
@@ -639,8 +667,6 @@ jobs:
         steps:
             - uses: dtolnay/rust-toolchain@stable
 
-            - uses: actions/checkout@v4
-
             - name: Setup cargo-machete
               uses: BSteffaniak/cache-artifact@master
               with:
@@ -687,10 +713,17 @@ jobs:
         steps:
             - uses: actions/checkout@v4
               with:
+                  path: planning-poker
                   fetch-depth: 0
+
+            - uses: actions/checkout@v4
+              with:
+                  repository: MoosicBox/MoosicBox
+                  path: MoosicBox
 
             - name: Enable patches
               if: ${{ github.event_name == 'schedule' || github.event.inputs.edge == 'true' }}
+              working-directory: planning-poker
               run: |
                   git config user.name "MoosicBoxBot"
                   git config user.email "MoosicBoxBot@gmail.com"
@@ -707,6 +740,7 @@ jobs:
               uses: BSteffaniak/install-winget@v1
 
             - name: Setup CI
+              working-directory: planning-poker
               if: ${{ matrix.package.ciSteps }}
               run: ${{ matrix.package.ciSteps }}
 
@@ -729,11 +763,13 @@ jobs:
                   cmake-version: "3.x"
 
             - name: Install dependencies
+              working-directory: planning-poker
               if: ${{ matrix.package.dependencies }}
               shell: bash
               run: ${{ matrix.package.dependencies }}
 
             - name: Clippy ${{ matrix.package.name }}
+              working-directory: planning-poker
               shell: bash
               run: |
                   (cd ${{ matrix.package.path }}; \
@@ -756,6 +792,7 @@ jobs:
                       done <<<"$(echo '${{ toJson(matrix.package.features) }}' | jq -r '.[]')")
 
             - name: Run ${{ matrix.package.name }} tests
+              working-directory: planning-poker
               shell: bash
               run: |
                   (cd ${{ matrix.package.path }}; \
@@ -777,6 +814,7 @@ jobs:
                       done <<<"$(echo '${{ toJson(matrix.package.features) }}' | jq -r '.[]')")
 
             - name: Format ${{ matrix.package.name }}
+              working-directory: planning-poker
               shell: bash
               run: |
                   (cd ${{ matrix.package.path }}; ${{ matrix.package.env }} cargo${{ matrix.package.nightly && ' +nightly' || '' }} ${{ runner.debug && '-vv' }} fmt --all -- --check)
@@ -815,18 +853,21 @@ jobs:
               run: chmod +x ~/.cargo/bin/cargo-machete.exe
 
             - name: Validate ${{ matrix.package.name }} dependencies (machete)
+              working-directory: planning-poker
               if: ${{ matrix.package.os == 'macos-latest' }}
               shell: bash
               run: |
                   ${{ matrix.package.env }} ~/.cargo/bin/cargo-machete --with-metadata ${{ matrix.package.path }}
 
             - name: Validate ${{ matrix.package.name }} dependencies (machete)
+              working-directory: planning-poker
               if: ${{ matrix.package.os == 'ubuntu-latest' }}
               shell: bash
               run: |
                   ${{ matrix.package.env }} ~/.cargo/bin/cargo-machete --with-metadata ${{ matrix.package.path }}
 
             - name: Validate ${{ matrix.package.name }} dependencies (machete)
+              working-directory: planning-poker
               if: ${{ matrix.package.os == 'windows-latest' }}
               shell: bash
               run: |
