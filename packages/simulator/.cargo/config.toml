@@ -1,6 +1,3 @@
 [build]
 target-dir = "../../target"
 
-[[bin]]
-name = "planning-poker-simulator"
-path = "src/main.rs"
