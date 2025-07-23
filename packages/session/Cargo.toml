@@ -21,3 +21,8 @@ switchy                 = { workspace = true, features = ["database"] }
 tracing                 = { workspace = true }
 uuid                    = { workspace = true }
 
+[features]
+default = []
+
+fail-on-warnings = []
+

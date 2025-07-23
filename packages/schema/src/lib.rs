@@ -1,5 +1,9 @@
+#![cfg_attr(feature = "fail-on-warnings", deny(warnings))]
+#![warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
+#![allow(clippy::multiple_crate_versions)]
+
 use anyhow::Result;
-use include_dir::{include_dir, Dir};
+use include_dir::Dir;
 use planning_poker_database::Database;
 use thiserror::Error;
 
@@ -23,11 +27,23 @@ pub struct Migrations {
 
 impl Migrations {
     /// Run all migrations in the directory
+    ///
+    /// # Errors
+    ///
+    /// Returns `MigrateError` if any migration fails to execute
     pub async fn run(&'static self, db: &dyn Database) -> Result<(), MigrateError> {
         self.run_until(db, None).await
     }
 
     /// Run migrations up to a specific migration name
+    ///
+    /// # Errors
+    ///
+    /// Returns `MigrateError` if any migration fails to execute
+    ///
+    /// # Panics
+    ///
+    /// Panics if a migration directory name cannot be extracted (should never happen with valid migration directories)
     pub async fn run_until(
         &'static self,
         db: &dyn Database,
@@ -74,12 +90,12 @@ impl Migrations {
 
     async fn create_migrations_table(&self, db: &dyn Database) -> Result<(), MigrateError> {
         let sql = format!(
-            r#"
+            r"
             CREATE TABLE IF NOT EXISTS {MIGRATIONS_TABLE_NAME} (
                 name TEXT PRIMARY KEY NOT NULL,
                 run_on TEXT NOT NULL DEFAULT (datetime('now'))
             )
-            "#
+            "
         );
 
         db.exec_raw(&sql).await?;
@@ -140,16 +156,24 @@ impl Migrations {
 // Embedded migrations for SQLite
 #[cfg(feature = "sqlite")]
 pub const SQLITE_MIGRATIONS: Migrations = Migrations {
-    directory: &include_dir!("$CARGO_MANIFEST_DIR/migrations/sqlite"),
+    directory: &include_dir::include_dir!("$CARGO_MANIFEST_DIR/migrations/sqlite"),
 };
 
-// Main migration function for the planning poker database
+/// Main migration function for the planning poker database
+///
+/// # Errors
+///
+/// Returns `MigrateError` if any migration fails to execute
 #[cfg(feature = "sqlite")]
 pub async fn migrate(db: &dyn Database) -> Result<(), MigrateError> {
     SQLITE_MIGRATIONS.run(db).await
 }
 
-// Migration function that runs up to a specific migration
+/// Migration function that runs up to a specific migration
+///
+/// # Errors
+///
+/// Returns `MigrateError` if any migration fails to execute
 #[cfg(feature = "sqlite")]
 pub async fn migrate_until(
     db: &dyn Database,
@@ -160,6 +184,7 @@ pub async fn migrate_until(
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "sqlite")]
     use super::*;
 
     #[test]

@@ -21,3 +21,5 @@ url       = { workspace = true, optional = true }
 default  = ["sqlite"]
 postgres = ["dep:url", "switchy/database-connection-postgres"]
 sqlite   = ["switchy/database-connection-sqlite-rusqlite"]
+
+fail-on-warnings = []

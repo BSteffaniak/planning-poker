@@ -22,3 +22,5 @@ tracing = { workspace = true }
 default = ["sqlite"]
 sqlite = ["planning_poker_database/sqlite"]
 postgres = ["planning_poker_database/postgres"]
+
+fail-on-warnings = []

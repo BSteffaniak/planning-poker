@@ -15,3 +15,8 @@ anyhow = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 toml = "0.9.2"
+
+[features]
+default = []
+
+fail-on-warnings = []

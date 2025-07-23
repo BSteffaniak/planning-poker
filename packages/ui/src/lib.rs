@@ -1,3 +1,7 @@
+#![cfg_attr(feature = "fail-on-warnings", deny(warnings))]
+#![warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
+#![allow(clippy::multiple_crate_versions)]
+
 use hyperchad::{
     renderer::View,
     router::{RouteRequest, Router},
@@ -33,20 +37,23 @@ impl Default for PlanningPokerApp {
 }
 
 impl PlanningPokerApp {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             state: AppState::default(),
         }
     }
 
-    pub fn get_state(&self) -> &AppState {
+    #[must_use]
+    pub const fn get_state(&self) -> &AppState {
         &self.state
     }
 
-    pub fn get_state_mut(&mut self) -> &mut AppState {
+    pub const fn get_state_mut(&mut self) -> &mut AppState {
         &mut self.state
     }
 
+    #[must_use]
     pub fn get_voting_options() -> Vec<String> {
         // Default Fibonacci sequence
         vec![
@@ -66,6 +73,7 @@ impl PlanningPokerApp {
     }
 }
 
+#[must_use]
 pub fn create_router() -> Router {
     Router::new()
         .with_route_result("/", |_request: RouteRequest| {
@@ -91,7 +99,7 @@ pub fn create_router() -> Router {
 }
 
 #[must_use]
-pub fn page_layout(content: Containers) -> Containers {
+pub fn page_layout(content: &Containers) -> Containers {
     tracing::info!("page_layout called, wrapping content with main-content div");
     container! {
         div id="main-content" width=100% height=100% padding=20 overflow-y="auto" {
@@ -102,7 +110,8 @@ pub fn page_layout(content: Containers) -> Containers {
 
 #[must_use]
 pub fn app_layout() -> Containers {
-    page_layout(home_content())
+    let content = home_content();
+    page_layout(&content)
 }
 
 #[must_use]
@@ -149,6 +158,7 @@ pub fn home_content() -> Containers {
 
 // UI Component Functions
 
+#[must_use]
 pub fn game_status_section(status: &str) -> Containers {
     container! {
         div id="game-status" margin-top=20 {
@@ -160,6 +170,7 @@ pub fn game_status_section(status: &str) -> Containers {
     }
 }
 
+#[must_use]
 pub fn players_section(players: &[Player]) -> Containers {
     container! {
         div margin-top=20 {
@@ -183,6 +194,7 @@ pub fn players_section(players: &[Player]) -> Containers {
     }
 }
 
+#[must_use]
 pub fn voting_section(game_id: &str, voting_active: bool) -> Containers {
     let start_voting_url = format!("/api/games/{game_id}/start-voting");
 
@@ -213,6 +225,7 @@ pub fn voting_section(game_id: &str, voting_active: bool) -> Containers {
     }
 }
 
+#[must_use]
 pub fn vote_buttons(game_id: &str) -> Containers {
     let vote_values = ["1", "2", "3", "5", "8", "13", "?"];
 
@@ -229,6 +242,7 @@ pub fn vote_buttons(game_id: &str) -> Containers {
     }
 }
 
+#[must_use]
 pub fn results_section(game_id: &str, votes: &[Vote], votes_revealed: bool) -> Containers {
     let reveal_url = format!("/api/games/{game_id}/reveal");
     let reset_url = format!("/api/games/{game_id}/reset");
@@ -270,6 +284,7 @@ pub fn results_section(game_id: &str, votes: &[Vote], votes_revealed: bool) -> C
     }
 }
 // Partial update UI functions for SSE
+#[must_use]
 pub fn players_list_content(players: &[Player]) -> Containers {
     container! {
         @if players.is_empty() {
@@ -288,6 +303,7 @@ pub fn players_list_content(players: &[Player]) -> Containers {
     }
 }
 
+#[must_use]
 pub fn vote_results_content(votes: &[Vote], revealed: bool) -> Containers {
     container! {
         @if votes.is_empty() {
@@ -311,6 +327,7 @@ pub fn vote_results_content(votes: &[Vote], revealed: bool) -> Containers {
     }
 }
 
+#[must_use]
 pub fn game_status_content(status: &str) -> Containers {
     container! {
         div padding=10 background="#f0f0f0" border-radius=5 {
@@ -320,6 +337,7 @@ pub fn game_status_content(status: &str) -> Containers {
     }
 }
 
+#[must_use]
 pub fn story_input_content(game_id: &str, voting_active: bool) -> Containers {
     let start_voting_url = format!("/api/games/{game_id}/start-voting");
 
@@ -343,21 +361,22 @@ pub fn story_input_content(game_id: &str, voting_active: bool) -> Containers {
 }
 
 pub fn game_page_with_data(
-    game_id: String,
-    game: Game,
-    players: Vec<Player>,
-    votes: Vec<Vote>,
+    game_id: &str,
+    game: &Game,
+    players: &[Player],
+    votes: &[Vote],
 ) -> Containers {
     tracing::info!("game_page_with_data called, wrapping with page_layout");
     let content = game_content_with_data(game_id, game, players, votes);
-    page_layout(content)
+    page_layout(&content)
 }
 
+#[must_use]
 pub fn game_content_with_data(
-    game_id: String,
-    game: Game,
-    players: Vec<Player>,
-    votes: Vec<Vote>,
+    game_id: &str,
+    game: &Game,
+    players: &[Player],
+    votes: &[Vote],
 ) -> Containers {
     let game_id_display = format!("Game ID: {game_id}");
     let status_text = match game.state {

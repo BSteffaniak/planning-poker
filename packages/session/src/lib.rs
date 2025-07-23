@@ -1,3 +1,7 @@
+#![cfg_attr(feature = "fail-on-warnings", deny(warnings))]
+#![warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
+#![allow(clippy::multiple_crate_versions)]
+
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -43,12 +47,18 @@ pub struct DatabaseSessionManager {
 }
 
 impl DatabaseSessionManager {
+    #[must_use]
     pub fn new(db: Box<dyn Database>) -> Self {
         Self {
             db: std::sync::Arc::new(db),
         }
     }
 
+    /// Initialize the database schema by running migrations
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the database migrations fail
     pub async fn init_schema(&self) -> Result<()> {
         tracing::info!("Running database migrations...");
 
@@ -77,13 +87,12 @@ fn get_string_from_row(row: &Row, column: &str) -> Result<String> {
 fn get_optional_string_from_row(row: &Row, column: &str) -> Result<Option<String>> {
     match row.get(column) {
         Some(DatabaseValue::String(s)) => Ok(Some(s)),
-        Some(DatabaseValue::Null) => Ok(None),
+        Some(DatabaseValue::Null) | None => Ok(None),
         Some(value) => Err(anyhow::anyhow!(
             "Expected string or null for column '{}', got {:?}",
             column,
             value
         )),
-        None => Ok(None),
     }
 }
 
@@ -132,7 +141,7 @@ fn row_to_player(row: &Row) -> Result<Player> {
     })
 }
 
-fn rows_to_players(rows: Vec<Row>) -> Result<Vec<Player>> {
+fn rows_to_players(rows: &[Row]) -> Result<Vec<Player>> {
     rows.iter().map(row_to_player).collect()
 }
 
@@ -146,7 +155,7 @@ fn row_to_vote(row: &Row) -> Result<Vote> {
     })
 }
 
-fn rows_to_votes(rows: Vec<Row>) -> Result<Vec<Vote>> {
+fn rows_to_votes(rows: &[Row]) -> Result<Vec<Vote>> {
     rows.iter().map(row_to_vote).collect()
 }
 
@@ -230,10 +239,11 @@ impl SessionManager for DatabaseSessionManager {
             .value("state", DatabaseValue::String(state_str.to_string()))
             .value(
                 "current_story",
-                match &game.current_story {
-                    Some(story) => DatabaseValue::String(story.clone()),
-                    None => DatabaseValue::Null,
-                },
+                game.current_story
+                    .as_ref()
+                    .map_or(DatabaseValue::Null, |story| {
+                        DatabaseValue::String(story.clone())
+                    }),
             )
             .value(
                 "updated_at",
@@ -262,7 +272,7 @@ impl SessionManager for DatabaseSessionManager {
             .value("name", DatabaseValue::String(player.name))
             .value(
                 "is_observer",
-                DatabaseValue::Number(if player.is_observer { 1 } else { 0 }),
+                DatabaseValue::Number(i64::from(player.is_observer)),
             )
             .value(
                 "joined_at",
@@ -290,7 +300,7 @@ impl SessionManager for DatabaseSessionManager {
             .execute(&**self.db)
             .await?;
 
-        let players = rows_to_players(rows)?;
+        let players = rows_to_players(&rows)?;
         Ok(players)
     }
 
@@ -335,7 +345,7 @@ impl SessionManager for DatabaseSessionManager {
             .execute(&**self.db)
             .await?;
 
-        let votes = rows_to_votes(rows)?;
+        let votes = rows_to_votes(&rows)?;
         Ok(votes)
     }
 

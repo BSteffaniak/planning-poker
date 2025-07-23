@@ -1,5 +1,8 @@
+#![cfg_attr(feature = "fail-on-warnings", deny(warnings))]
+#![warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
+#![allow(clippy::multiple_crate_versions)]
+
 use anyhow::Result;
-use std::path::Path;
 pub use switchy::database::Database;
 use switchy::database_connection::{init, InitDbError};
 use thiserror::Error;
@@ -30,7 +33,16 @@ impl Default for DatabaseConfig {
     }
 }
 
-/// Create a database connection using switchy::database
+/// Create a database connection using `switchy::database`
+///
+/// # Errors
+///
+/// Returns `DatabaseError::Connection` if the database URL is invalid or unsupported
+/// Returns `DatabaseError::Init` if database initialization fails
+///
+/// # Panics
+///
+/// Panics if the `SQLite` URL prefix cannot be stripped (this should never happen if the URL starts with "sqlite://")
 pub async fn create_connection(config: DatabaseConfig) -> Result<Box<dyn Database>, DatabaseError> {
     tracing::info!(
         "Creating database connection with URL: {}",
@@ -38,15 +50,15 @@ pub async fn create_connection(config: DatabaseConfig) -> Result<Box<dyn Databas
     );
 
     if config.database_url.starts_with("sqlite://") {
-        let path_str = config.database_url.strip_prefix("sqlite://").unwrap();
-        let path = if path_str.is_empty() || path_str == ":memory:" {
-            None
-        } else {
-            Some(Path::new(path_str))
-        };
-
         #[cfg(feature = "sqlite")]
         {
+            let path_str = config.database_url.strip_prefix("sqlite://").unwrap();
+            let path = if path_str.is_empty() || path_str == ":memory:" {
+                None
+            } else {
+                Some(std::path::Path::new(path_str))
+            };
+
             let db = init(path, None).await?;
             Ok(db)
         }
@@ -86,7 +98,7 @@ pub async fn create_connection(config: DatabaseConfig) -> Result<Box<dyn Databas
                 ));
             }
 
-            let password = url.password().map(|p| p.to_string());
+            let password = url.password().map(ToString::to_string);
 
             let creds = switchy::database_connection::Credentials::new(
                 host,
@@ -94,7 +106,12 @@ pub async fn create_connection(config: DatabaseConfig) -> Result<Box<dyn Databas
                 username,
                 password,
             );
-            let db = init(None, Some(creds)).await?;
+            let db = init(
+                #[cfg(feature = "sqlite")]
+                None,
+                Some(creds),
+            )
+            .await?;
             Ok(db)
         }
         #[cfg(not(feature = "postgres"))]

@@ -1,3 +1,7 @@
+#![cfg_attr(feature = "fail-on-warnings", deny(warnings))]
+#![warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
+#![allow(clippy::multiple_crate_versions)]
+
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -49,12 +53,19 @@ impl Default for Config {
 }
 
 impl Config {
+    /// Load configuration from a TOML file
+    ///
+    /// # Errors
+    ///
+    /// Returns `ConfigError::ReadError` if the file cannot be read
+    /// Returns `ConfigError::ParseError` if the TOML cannot be parsed
     pub fn from_file(path: &str) -> Result<Self, ConfigError> {
         let content = fs::read_to_string(path)?;
-        let config: Config = toml::from_str(&content)?;
+        let config: Self = toml::from_str(&content)?;
         Ok(config)
     }
 
+    #[must_use]
     pub fn from_env() -> Self {
         let mut config = Self::default();
 
@@ -79,6 +90,7 @@ impl Config {
         config
     }
 
+    #[must_use]
     pub fn merge_with_env(mut self) -> Self {
         let env_config = Self::from_env();
 

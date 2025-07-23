@@ -90,3 +90,5 @@ insecure      = ["hyperchad/renderer-vanilla-js-plugin-uuid-insecure"]
 static-routes = ["hyperchad/router-static-routes"]
 
 dev = ["assets", "insecure", "static-routes"]
+
+fail-on-warnings = []

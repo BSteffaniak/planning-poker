@@ -1,12 +1,17 @@
+#![cfg_attr(feature = "fail-on-warnings", deny(warnings))]
+#![warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
+#![allow(clippy::multiple_crate_versions)]
+
 use anyhow::Result;
 use hyperchad::app::AppBuilder;
 use planning_poker_app::set_renderer;
 use planning_poker_config::Config;
 use planning_poker_database::{create_connection, DatabaseConfig};
-use planning_poker_session::DatabaseSessionManager;
+use planning_poker_session::{DatabaseSessionManager, SessionManager};
 use std::sync::Arc;
 use tracing::info;
 
+#[allow(clippy::cognitive_complexity)]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize tracing - respect RUST_LOG environment variable
     tracing_subscriber::fmt()
@@ -46,7 +51,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Create router with planning poker routes and database access
-    let router = planning_poker_app::create_app_router(session_manager);
+    let router =
+        planning_poker_app::create_app_router(&(session_manager as Arc<dyn SessionManager>));
 
     // Build hyperchad app with runtime handle - following MoosicBox pattern
     #[cfg_attr(not(feature = "assets"), allow(unused_mut))]

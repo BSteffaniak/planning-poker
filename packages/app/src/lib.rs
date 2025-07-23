@@ -1,3 +1,7 @@
+#![cfg_attr(feature = "fail-on-warnings", deny(warnings))]
+#![warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
+#![allow(clippy::multiple_crate_versions)]
+
 use anyhow::Result;
 use chrono::Utc;
 use hyperchad::{
@@ -106,6 +110,7 @@ pub struct VoteForm {
 }
 
 // SSE Partial Update Helper Functions
+#[allow(clippy::cognitive_complexity)]
 async fn send_partial_update(target: &str, content: Containers) {
     let Some(renderer) = RENDERER.get() else {
         tracing::warn!("RENDERER not initialized, cannot send partial update");
@@ -140,6 +145,7 @@ async fn update_players_list(_game_id: &str, players: Vec<Player>) {
     send_partial_update("players-list", content).await;
 }
 
+#[allow(clippy::cognitive_complexity)]
 async fn update_vote_buttons(game_id: &str, voting_active: bool) {
     tracing::info!(
         "VOTE BUTTONS: update_vote_buttons called for game {}, voting_active: {}",
@@ -183,6 +189,7 @@ async fn update_story_input(game_id: &str, voting_active: bool) {
     send_partial_update("story-input", content).await;
 }
 
+#[allow(clippy::cognitive_complexity)]
 async fn update_vote_results(_game_id: &str, votes: Vec<Vote>, revealed: bool) {
     tracing::info!(
         "Updating vote results: {} votes, revealed: {}",
@@ -271,7 +278,7 @@ pub fn set_renderer(renderer: Arc<dyn Renderer>) {
     }
 }
 
-pub fn create_app_router(session_manager: Arc<dyn SessionManager>) -> Router {
+pub fn create_app_router(session_manager: &Arc<dyn SessionManager>) -> Router {
     planning_poker_ui::create_router()
         .with_route_result("/join-game", {
             let session_manager = session_manager.clone();
@@ -332,6 +339,19 @@ pub fn create_app_router(session_manager: Arc<dyn SessionManager>) -> Router {
         )
 }
 
+/// Handles the join game route
+///
+/// # Errors
+///
+/// * If method is not POST
+/// * If game ID is not a valid UUID
+/// * If game ID is not found
+/// * If adding player to game fails
+/// * If getting game players fails
+///
+/// # Panics
+///
+/// * Infallible
 pub async fn join_game_route(
     req: RouteRequest,
     session_manager: Arc<dyn SessionManager>,
@@ -386,7 +406,7 @@ pub async fn join_game_route(
                     }
                 }
             };
-            let success_content = planning_poker_ui::page_layout(content);
+            let success_content = planning_poker_ui::page_layout(&content);
 
             Ok(Content::try_view(success_content).unwrap())
         }
@@ -395,6 +415,19 @@ pub async fn join_game_route(
     }
 }
 
+/// Handles the create game router
+///
+/// # Errors
+///
+/// * If method is not POST
+/// * If form data is missing
+/// * If form data is invalid
+/// * If creating game fails
+/// * If getting game fails
+///
+/// # Panics
+///
+/// * Infallible
 pub async fn create_game_route(
     req: RouteRequest,
     session_manager: Arc<dyn SessionManager>,
@@ -444,7 +477,7 @@ pub async fn create_game_route(
                     }
                 }
             };
-            let success_content = planning_poker_ui::page_layout(content);
+            let success_content = planning_poker_ui::page_layout(&content);
             Ok(Content::try_view(success_content).unwrap())
         }
         Err(e) => Err(RouteError::RouteFailed(format!(
@@ -453,6 +486,20 @@ pub async fn create_game_route(
     }
 }
 
+/// Handles the game page route
+///
+/// # Errors
+///
+/// * If method is not GET
+/// * If game ID is not a valid UUID
+/// * If game ID is not found
+/// * If getting game fails
+/// * If getting game players fails
+/// * If getting game votes fails
+///
+/// # Panics
+///
+/// * Infallible
 pub async fn game_page_route(
     req: RouteRequest,
     session_manager: Arc<dyn SessionManager>,
@@ -482,12 +529,8 @@ pub async fn game_page_route(
                 .get_game_votes(game_id)
                 .await
                 .unwrap_or_default();
-            let game_content = planning_poker_ui::game_page_with_data(
-                game_id_str.to_string(),
-                game,
-                players,
-                votes,
-            );
+            let game_content =
+                planning_poker_ui::game_page_with_data(game_id_str, &game, &players, &votes);
             Ok(Content::try_view(game_content).unwrap())
         }
         Ok(None) => Err(RouteError::RouteFailed("Game not found".to_string())),
@@ -495,6 +538,20 @@ pub async fn game_page_route(
     }
 }
 
+/// Handles the get game route
+///
+/// # Errors
+///
+/// * If method is not GET
+/// * If game ID is not a valid UUID
+/// * If game ID is not found
+/// * If getting game fails
+/// * If getting game players fails
+/// * If getting game votes fails
+///
+/// # Panics
+///
+/// * Infallible
 pub async fn get_game_route(
     req: RouteRequest,
     session_manager: Arc<dyn SessionManager>,
@@ -544,7 +601,7 @@ pub async fn get_game_route(
                     }
                 }
             };
-            let game_content = planning_poker_ui::page_layout(content);
+            let game_content = planning_poker_ui::page_layout(&content);
             Ok(Content::try_view(game_content).unwrap())
         }
         Ok(None) => Err(RouteError::RouteFailed("Game not found".to_string())),
@@ -552,6 +609,18 @@ pub async fn get_game_route(
     }
 }
 
+/// Handles the join game API route
+///
+/// # Errors
+///
+/// * If method is not POST
+/// * If game ID is not a valid UUID
+/// * If game ID is not found
+/// * If adding player to game fails
+///
+/// # Panics
+///
+/// * Infallible
 pub async fn join_game_api_route(
     req: RouteRequest,
     session_manager: Arc<dyn SessionManager>,
@@ -580,7 +649,7 @@ pub async fn join_game_api_route(
                 .add_player_to_game(game_id, player.clone())
                 .await
             {
-                Ok(_) => {
+                Ok(()) => {
                     // Send real-time updates to all connected clients
                     if let Ok(players) = session_manager.get_game_players(game_id).await {
                         update_players_list(game_id_str, players).await;
@@ -603,6 +672,20 @@ pub async fn join_game_api_route(
     }
 }
 
+/// Handles the vote route
+///
+/// # Errors
+///
+/// * If method is not POST
+/// * If game ID is not a valid UUID
+/// * If game ID is not found
+/// * If getting game fails
+/// * If getting game players fails
+/// * If casting vote fails
+///
+/// # Panics
+///
+/// * Infallible
 pub async fn vote_route(
     req: RouteRequest,
     session_manager: Arc<dyn SessionManager>,
@@ -638,7 +721,7 @@ pub async fn vote_route(
         cast_at: Utc::now(),
     };
     match session_manager.cast_vote(game_id, vote).await {
-        Ok(_) => {
+        Ok(()) => {
             tracing::info!(
                 "Vote cast successfully for game {}, triggering partial updates",
                 game_id
@@ -667,6 +750,20 @@ pub async fn vote_route(
     }
 }
 
+/// Handles the reveal votes route
+///
+/// # Errors
+///
+/// * If method is not POST
+/// * If game ID is not a valid UUID
+/// * If game ID is not found
+/// * If getting game fails
+/// * If revealing votes fails
+///
+/// # Panics
+///
+/// * Infallible
+#[allow(clippy::cognitive_complexity)]
 pub async fn reveal_votes_route(
     req: RouteRequest,
     session_manager: Arc<dyn SessionManager>,
@@ -682,7 +779,7 @@ pub async fn reveal_votes_route(
 
     // Reveal the votes first
     match session_manager.reveal_votes(game_id).await {
-        Ok(_) => {
+        Ok(()) => {
             tracing::info!(
                 "Votes revealed successfully for game {}, triggering partial updates",
                 game_id
@@ -724,6 +821,23 @@ pub async fn reveal_votes_route(
     }
 }
 
+/// Handles the start voting route
+///
+/// # Errors
+///
+/// * If method is not POST
+/// * If game ID is not a valid UUID
+/// * If game ID is not found
+/// * If getting game fails
+/// * If starting voting fails
+/// * If getting game votes fails
+/// * If getting game fails
+/// * If game state is not waiting
+///
+/// # Panics
+///
+/// * Infallible
+#[allow(clippy::cognitive_complexity)]
 pub async fn start_voting_route(
     req: RouteRequest,
     session_manager: Arc<dyn SessionManager>,
@@ -752,7 +866,7 @@ pub async fn start_voting_route(
     let story = "Current Story".to_string();
 
     match session_manager.start_voting(game_id, story).await {
-        Ok(_) => {
+        Ok(()) => {
             tracing::info!(
                 "START VOTING: session_manager.start_voting() completed successfully for game {}",
                 game_id
@@ -800,6 +914,21 @@ pub async fn start_voting_route(
     }
 }
 
+/// Handles the reset voting route
+///
+/// # Errors
+///
+/// * If method is not POST
+/// * If game ID is not a valid UUID
+/// * If game ID is not found
+/// * If getting game fails
+/// * If resetting voting fails
+/// * If getting game votes fails
+///
+/// # Panics
+///
+/// * Infallible
+#[allow(clippy::cognitive_complexity)]
 pub async fn reset_voting_route(
     req: RouteRequest,
     session_manager: Arc<dyn SessionManager>,
@@ -814,7 +943,7 @@ pub async fn reset_voting_route(
     let game_id = Uuid::parse_str(game_id_str)?;
 
     match session_manager.reset_voting(game_id).await {
-        Ok(_) => {
+        Ok(()) => {
             tracing::info!(
                 "Voting reset successfully for game {}, triggering partial updates",
                 game_id
@@ -862,12 +991,13 @@ pub async fn reset_voting_route(
 mod tests {
     use super::*;
     use bytes::Bytes;
-    use hyperchad::router::RouteRequest;
+    use hyperchad::router::{RequestInfo, RouteRequest};
     use planning_poker_config::Config;
     use planning_poker_database::{create_connection, DatabaseConfig};
     use planning_poker_session::DatabaseSessionManager;
     use std::collections::BTreeMap;
     use std::sync::Arc;
+
     #[tokio::test]
     async fn test_join_game_form_parsing() {
         // Create a mock form data for multipart/form-data
@@ -894,7 +1024,7 @@ mod tests {
             query: BTreeMap::new(),
             headers,
             cookies: BTreeMap::new(),
-            info: Default::default(),
+            info: RequestInfo::default(),
             body: Some(Arc::new(body)),
         };
 
