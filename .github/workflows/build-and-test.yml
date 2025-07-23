@@ -153,7 +153,7 @@ jobs:
               with:
                   working-directory: planning-poker
                   token: ${{ secrets.CODECOV_TOKEN }}
-                  slug: MoosicBox/MoosicBox
+                  slug: BSteffaniak/planning-poker
                   fail_ci_if_error: true
 
     determine-affected-packages:
