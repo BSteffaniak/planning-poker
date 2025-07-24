@@ -162,6 +162,10 @@ resource "aws_lambda_function" "app_debug" {
 
 # Lambda function URL (for API Gateway integration)
 resource "aws_lambda_function_url" "app" {
+  depends_on = [
+    terraform_data.build_lambda
+  ]
+
   function_name      = var.debug_mode ? aws_lambda_function.app_debug[0].function_name : aws_lambda_function.app_release[0].function_name
   authorization_type = "NONE"
 

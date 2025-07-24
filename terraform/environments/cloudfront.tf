@@ -9,6 +9,11 @@ resource "aws_cloudfront_origin_access_control" "s3" {
 
 # CloudFront distribution
 resource "aws_cloudfront_distribution" "main" {
+  depends_on = [
+    aws_lambda_function_url.app,
+    terraform_data.build_lambda
+  ]
+
   aliases = [local.subdomain]
 
   # S3 origin for static assets
