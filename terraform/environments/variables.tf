@@ -25,3 +25,10 @@ variable "debug_mode" {
   type        = bool
   default     = false
 }
+
+variable "database_url" {
+  description = "Database connection URL (PostgreSQL)"
+  type        = string
+  sensitive   = true
+  default     = null
+}

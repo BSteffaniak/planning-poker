@@ -106,6 +106,7 @@ resource "aws_lambda_function" "app_release" {
         ENVIRONMENT = var.environment
         RUST_LOG    = var.enable_debug_logging ? "planning_poker=debug,hyperchad=debug" : "planning_poker=info"
       },
+      var.database_url != null ? { DATABASE_URL = var.database_url } : {},
       var.lambda_environment_variables
     )
   }
@@ -141,6 +142,7 @@ resource "aws_lambda_function" "app_debug" {
         RUST_LOG    = "debug"
         RUST_BACKTRACE = "full"
       },
+      var.database_url != null ? { DATABASE_URL = var.database_url } : {},
       var.lambda_environment_variables
     )
   }

@@ -13,10 +13,10 @@ rm -rf target/lambda/
 # Build Lambda function
 if [ "${DEBUG_MODE:-false}" = "true" ]; then
     echo "Building Lambda in DEBUG mode..."
-    cargo lambda build -p planning_poker_app --bin planning-poker-app-lambda --no-default-features --features lambda,vanilla-js
+    cargo lambda build -p planning_poker_app --bin planning-poker-app-lambda --no-default-features --features lambda,vanilla-js,postgres
 else
     echo "Building Lambda in RELEASE mode..."
-    cargo lambda build -p planning_poker_app --release --bin planning-poker-app-lambda --no-default-features --features lambda,vanilla-js
+    cargo lambda build -p planning_poker_app --release --bin planning-poker-app-lambda --no-default-features --features lambda,vanilla-js,postgres
 fi
 
 # Verify build output
