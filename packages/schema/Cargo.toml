@@ -12,7 +12,7 @@ version     = "0.1.0"
 
 [dependencies]
 planning_poker_database = { workspace = true }
-switchy = { workspace = true, features = ["database"] }
+switchy = { workspace = true, features = ["database", "database-schema"] }
 anyhow = { workspace = true }
 include_dir = { workspace = true }
 thiserror = { workspace = true }

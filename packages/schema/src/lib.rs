@@ -4,7 +4,8 @@
 
 use anyhow::Result;
 use include_dir::Dir;
-use planning_poker_database::Database;
+use planning_poker_database::{Database, DatabaseValue};
+use switchy::database::schema::{Column, DataType};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -89,16 +90,24 @@ impl Migrations {
     }
 
     async fn create_migrations_table(&self, db: &dyn Database) -> Result<(), MigrateError> {
-        let sql = format!(
-            r"
-            CREATE TABLE IF NOT EXISTS {MIGRATIONS_TABLE_NAME} (
-                name TEXT PRIMARY KEY NOT NULL,
-                run_on TEXT NOT NULL DEFAULT (datetime('now'))
-            )
-            "
-        );
-
-        db.exec_raw(&sql).await?;
+        db.create_table(MIGRATIONS_TABLE_NAME)
+            .if_not_exists(true)
+            .column(Column {
+                name: "name".to_string(),
+                nullable: false,
+                auto_increment: false,
+                data_type: DataType::Text,
+                default: None,
+            })
+            .column(Column {
+                name: "run_on".to_string(),
+                nullable: false,
+                auto_increment: false,
+                data_type: DataType::DateTime,
+                default: Some(DatabaseValue::Now),
+            })
+            .execute(db)
+            .await?;
         Ok(())
     }
 
