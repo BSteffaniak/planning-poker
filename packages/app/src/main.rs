@@ -2,7 +2,7 @@
 #![warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
 #![allow(clippy::multiple_crate_versions)]
 
-use planning_poker_app::{build_app, init, set_renderer, setup_database};
+use planning_poker_app::{build_app, init, set_renderer};
 use std::sync::Arc;
 use tracing::info;
 
@@ -23,14 +23,11 @@ fn main() -> Result<(), hyperchad::app::Error> {
 
     let runtime = Arc::new(runtime);
 
-    // Set up database first (this needs to be async)
-    let session_manager = runtime.block_on(async { setup_database().await })?;
-
     // Initialize app builder (synchronous like MoosicBox)
     let app_builder = init().with_runtime_handle(runtime.handle().clone());
 
-    // Build app with session manager
-    let app = build_app(app_builder, &session_manager)?;
+    // Build app (database will be initialized lazily when needed)
+    let app = build_app(app_builder)?;
 
     let renderer = Arc::new(app.renderer.clone());
     info!("Setting renderer");

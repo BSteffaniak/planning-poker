@@ -1,0 +1,30 @@
+[package]
+authors     = { workspace = true }
+categories  = ["state-management"]
+description = "State management for planning poker application"
+edition     = { workspace = true }
+keywords    = ["database", "session", "state"]
+license     = { workspace = true }
+name        = "planning_poker_state"
+readme      = "../../README.md"
+repository  = { workspace = true }
+version     = "0.1.0"
+
+[dependencies]
+anyhow                  = { workspace = true }
+planning_poker_config   = { workspace = true }
+planning_poker_database = { workspace = true }
+planning_poker_session  = { workspace = true }
+thiserror               = { workspace = true }
+tracing                 = { workspace = true }
+
+[features]
+default = ["sqlite"]
+postgres = [
+    "planning_poker_database/postgres",
+    "planning_poker_session/postgres",
+]
+sqlite = ["planning_poker_database/sqlite", "planning_poker_session/sqlite"]
+
+fail-on-warnings = []
+

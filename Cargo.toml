@@ -8,6 +8,7 @@ members = [
     "packages/schema",
     "packages/session",
     "packages/simulator",
+    "packages/state",
     "packages/ui",
 ]
 
@@ -62,6 +63,7 @@ planning_poker_poker     = { version = "0.1.0", default-features = false, path =
 planning_poker_schema    = { version = "0.1.0", default-features = false, path = "packages/schema" }
 planning_poker_session   = { version = "0.1.0", default-features = false, path = "packages/session" }
 planning_poker_simulator = { version = "0.1.0", default-features = false, path = "packages/simulator" }
+planning_poker_state     = { version = "0.1.0", default-features = false, path = "packages/state" }
 planning_poker_ui        = { version = "0.1.0", default-features = false, path = "packages/ui" }
 
 # External dependencies from MoosicBox workspace

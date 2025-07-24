@@ -38,7 +38,9 @@ hyperchad = { workspace = true, features = [
 planning_poker_config = { workspace = true }
 planning_poker_database = { workspace = true }
 planning_poker_models = { workspace = true }
+planning_poker_schema = { workspace = true }
 planning_poker_session = { workspace = true }
+planning_poker_state = { workspace = true }
 planning_poker_ui = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -76,9 +78,16 @@ vanilla-js = [
 
 postgres = [
     "planning_poker_database/postgres",
+    "planning_poker_schema/postgres",
     "planning_poker_session/postgres",
+    "planning_poker_state/postgres",
 ]
-sqlite = ["planning_poker_database/sqlite", "planning_poker_session/sqlite"]
+sqlite = [
+    "planning_poker_database/sqlite",
+    "planning_poker_schema/sqlite",
+    "planning_poker_session/sqlite",
+    "planning_poker_state/sqlite",
+]
 
 _sse = [
     "hyperchad/renderer-html-sse",

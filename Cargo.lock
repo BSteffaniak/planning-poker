@@ -5209,7 +5209,9 @@ dependencies = [
  "planning_poker_config",
  "planning_poker_database",
  "planning_poker_models",
+ "planning_poker_schema",
  "planning_poker_session",
+ "planning_poker_state",
  "planning_poker_ui",
  "serde",
  "serde_json",
@@ -5299,6 +5301,18 @@ dependencies = [
  "switchy",
  "thiserror 2.0.12",
  "uuid",
+]
+
+[[package]]
+name = "planning_poker_state"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "planning_poker_config",
+ "planning_poker_database",
+ "planning_poker_session",
+ "thiserror 2.0.12",
+ "tracing",
 ]
 
 [[package]]

@@ -10,17 +10,18 @@ use hyperchad::{
     template::{self as hyperchad_template, container, Containers},
     transformer::html::ParseError as HtmlParseError,
 };
-use planning_poker_config::Config;
-use planning_poker_database::{create_connection, DatabaseConfig};
 use planning_poker_models::{GameState, Player, Vote};
-use planning_poker_session::{DatabaseSessionManager, SessionManager};
+use planning_poker_state::PlanningPokerState;
 use serde::Deserialize;
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, LazyLock, OnceLock};
 use switchy::http::models::Method;
 
 use uuid::Uuid;
 
 static RENDERER: OnceLock<Arc<dyn Renderer>> = OnceLock::new();
+
+// Global lazy state - initialized on first access
+static STATE: LazyLock<PlanningPokerState> = LazyLock::new(PlanningPokerState::new);
 
 #[cfg(feature = "assets")]
 pub mod assets {
@@ -306,112 +307,51 @@ pub fn init() -> AppBuilder {
     app_builder
 }
 
-/// Set up database and create session manager
-///
-/// # Errors
-///
-/// * If database connection fails
-/// * If schema initialization fails
-pub async fn setup_database() -> Result<Arc<dyn SessionManager>, hyperchad::app::Error> {
-    // Set up database connection
-    let config = Config::from_env();
-    let database_url = config
-        .database_url
-        .unwrap_or_else(|| "sqlite://planning_poker.db".to_string());
-
-    let db_config = DatabaseConfig {
-        database_url,
-        max_connections: 10,
-        connection_timeout: std::time::Duration::from_secs(30),
-    };
-
-    // Create database connection and session manager
-    let db = create_connection(db_config).await.map_err(|e| {
-        hyperchad::app::Error::from(Box::new(e) as Box<dyn std::error::Error + Send>)
-    })?;
-    let session_manager = Arc::new(DatabaseSessionManager::new(db));
-
-    // Initialize database schema
-    session_manager
-        .init_schema()
-        .await
-        .map_err(|e| hyperchad::app::Error::from(Box::<dyn std::error::Error + Send>::from(e)))?;
-
-    Ok(session_manager as Arc<dyn SessionManager>)
-}
-
 /// Build the app from the configured builder
 ///
 /// # Errors
 ///
 /// * If app building fails
-pub fn build_app(
-    builder: AppBuilder,
-    session_manager: &Arc<dyn SessionManager>,
-) -> Result<App<DefaultRenderer>, hyperchad::app::Error> {
-    // Create router with planning poker routes and database access
-    let router = create_app_router(session_manager);
+pub fn build_app(builder: AppBuilder) -> Result<App<DefaultRenderer>, hyperchad::app::Error> {
+    // Create router with planning poker routes
+    let router = create_app_router();
 
     let app = builder.with_router(router).build_default()?;
     Ok(app)
 }
 
-pub fn create_app_router(session_manager: &Arc<dyn SessionManager>) -> Router {
+pub fn create_app_router() -> Router {
     planning_poker_ui::create_router()
-        .with_route_result("/join-game", {
-            let session_manager = session_manager.clone();
-            move |req| {
-                let session_manager = session_manager.clone();
-                async move { join_game_route(req, session_manager).await }
-            }
-        })
+        .with_route_result("/join-game", join_game_route)
         .with_route_result(
             hyperchad::router::RoutePath::LiteralPrefix("/game/".to_string()),
-            {
-                let session_manager = session_manager.clone();
-                move |req| {
-                    let session_manager = session_manager.clone();
-                    async move { game_page_route(req, session_manager).await }
-                }
-            },
+            game_page_route,
         )
-        .with_route_result("/api/games", {
-            let session_manager = session_manager.clone();
-            move |req| {
-                let session_manager = session_manager.clone();
-                async move {
-                    // Handle both POST /api/games (create) and GET /api/games/uuid (get)
-                    if req.path == "/api/games" {
-                        create_game_route(req, session_manager).await
-                    } else {
-                        get_game_route(req, session_manager).await
-                    }
-                }
+        .with_route_result("/api/games", |req| async move {
+            // Handle both POST /api/games (create) and GET /api/games/uuid (get)
+            if req.path == "/api/games" {
+                create_game_route(req).await
+            } else {
+                get_game_route(req).await
             }
         })
         .with_route_result(
             hyperchad::router::RoutePath::LiteralPrefix("/api/games/".to_string()),
-            {
-                let session_manager = session_manager.clone();
-                move |req| {
-                    let session_manager = session_manager.clone();
-                    async move {
-                        // Route based on the path suffix
-                        if req.path.ends_with("/join") {
-                            join_game_api_route(req, session_manager).await
-                        } else if req.path.ends_with("/vote") {
-                            vote_route(req, session_manager).await
-                        } else if req.path.ends_with("/reveal") {
-                            reveal_votes_route(req, session_manager).await
-                        } else if req.path.ends_with("/start-voting") {
-                            start_voting_route(req, session_manager).await
-                        } else if req.path.ends_with("/reset") {
-                            reset_voting_route(req, session_manager).await
-                        } else {
-                            // Default to get_game_route for paths like /api/games/uuid
-                            get_game_route(req, session_manager).await
-                        }
-                    }
+            |req| async move {
+                // Route based on the path suffix
+                if req.path.ends_with("/join") {
+                    join_game_api_route(req).await
+                } else if req.path.ends_with("/vote") {
+                    vote_route(req).await
+                } else if req.path.ends_with("/reveal") {
+                    reveal_votes_route(req).await
+                } else if req.path.ends_with("/start-voting") {
+                    start_voting_route(req).await
+                } else if req.path.ends_with("/reset") {
+                    reset_voting_route(req).await
+                } else {
+                    // Default to get_game_route for paths like /api/games/uuid
+                    get_game_route(req).await
                 }
             },
         )
@@ -430,10 +370,7 @@ pub fn create_app_router(session_manager: &Arc<dyn SessionManager>) -> Router {
 /// # Panics
 ///
 /// * Infallible
-pub async fn join_game_route(
-    req: RouteRequest,
-    session_manager: Arc<dyn SessionManager>,
-) -> Result<Content, RouteError> {
+pub async fn join_game_route(req: RouteRequest) -> Result<Content, RouteError> {
     if !matches!(req.method, Method::Post) {
         return Err(RouteError::UnsupportedMethod);
     }
@@ -453,6 +390,12 @@ pub async fn join_game_route(
 
     // Parse game ID as UUID
     let game_id = Uuid::parse_str(&form_data.game_id)?;
+
+    // Get session manager from global state
+    let session_manager = STATE
+        .get_session_manager()
+        .await
+        .map_err(|e| RouteError::RouteFailed(format!("Database connection failed: {e}")))?;
 
     // Check if game exists
     match session_manager.get_game(game_id).await {
@@ -506,10 +449,7 @@ pub async fn join_game_route(
 /// # Panics
 ///
 /// * Infallible
-pub async fn create_game_route(
-    req: RouteRequest,
-    session_manager: Arc<dyn SessionManager>,
-) -> Result<Content, RouteError> {
+pub async fn create_game_route(req: RouteRequest) -> Result<Content, RouteError> {
     if !matches!(req.method, Method::Post) {
         return Err(RouteError::UnsupportedMethod);
     }
@@ -527,6 +467,12 @@ pub async fn create_game_route(
         ));
     }
     let owner_id = Uuid::new_v4(); // TODO: Get from authentication
+
+    // Get session manager from global state
+    let session_manager = STATE
+        .get_session_manager()
+        .await
+        .map_err(|e| RouteError::RouteFailed(format!("Database connection failed: {e}")))?;
 
     match session_manager
         .create_game(
@@ -578,10 +524,7 @@ pub async fn create_game_route(
 /// # Panics
 ///
 /// * Infallible
-pub async fn game_page_route(
-    req: RouteRequest,
-    session_manager: Arc<dyn SessionManager>,
-) -> Result<Content, RouteError> {
+pub async fn game_page_route(req: RouteRequest) -> Result<Content, RouteError> {
     tracing::info!("game_page_route called with path: {}", req.path);
 
     if !matches!(req.method, Method::Get) {
@@ -596,6 +539,12 @@ pub async fn game_page_route(
         game_id_str
     );
     let game_id = Uuid::parse_str(game_id_str)?;
+
+    // Get session manager from global state
+    let session_manager = STATE
+        .get_session_manager()
+        .await
+        .map_err(|e| RouteError::RouteFailed(format!("Database connection failed: {e}")))?;
 
     match session_manager.get_game(game_id).await {
         Ok(Some(game)) => {
@@ -630,10 +579,7 @@ pub async fn game_page_route(
 /// # Panics
 ///
 /// * Infallible
-pub async fn get_game_route(
-    req: RouteRequest,
-    session_manager: Arc<dyn SessionManager>,
-) -> Result<Content, RouteError> {
+pub async fn get_game_route(req: RouteRequest) -> Result<Content, RouteError> {
     if !matches!(req.method, Method::Get) {
         return Err(RouteError::UnsupportedMethod);
     }
@@ -641,6 +587,12 @@ pub async fn get_game_route(
     // Extract game_id from path like "/api/games/uuid-here"
     let game_id_str = req.path.strip_prefix("/api/games/").unwrap_or("");
     let game_id = Uuid::parse_str(game_id_str)?;
+
+    // Get session manager from global state
+    let session_manager = STATE
+        .get_session_manager()
+        .await
+        .map_err(|e| RouteError::RouteFailed(format!("Database connection failed: {e}")))?;
 
     match session_manager.get_game(game_id).await {
         Ok(Some(game)) => {
@@ -699,10 +651,7 @@ pub async fn get_game_route(
 /// # Panics
 ///
 /// * Infallible
-pub async fn join_game_api_route(
-    req: RouteRequest,
-    session_manager: Arc<dyn SessionManager>,
-) -> Result<Content, RouteError> {
+pub async fn join_game_api_route(req: RouteRequest) -> Result<Content, RouteError> {
     if !matches!(req.method, Method::Post) {
         return Err(RouteError::UnsupportedMethod);
     }
@@ -714,6 +663,12 @@ pub async fn join_game_api_route(
     let body = req.body.as_ref().ok_or(RouteError::MissingFormData)?;
     let join_request: JoinGameRequest = serde_json::from_slice(body)
         .map_err(|e| RouteError::ParseBody(ParseError::SerdeJson(e)))?;
+
+    // Get session manager from global state
+    let session_manager = STATE
+        .get_session_manager()
+        .await
+        .map_err(|e| RouteError::RouteFailed(format!("Database connection failed: {e}")))?;
 
     match session_manager.get_game(game_id).await {
         Ok(Some(_)) => {
@@ -750,6 +705,49 @@ pub async fn join_game_api_route(
     }
 }
 
+/// Extract game ID from API path
+fn extract_game_id_from_path(path: &str) -> Result<(Uuid, &str), RouteError> {
+    let path_parts: Vec<&str> = path.split('/').collect();
+    let game_id_str = path_parts.get(3).unwrap_or(&"");
+    let game_id = Uuid::parse_str(game_id_str)?;
+    Ok((game_id, game_id_str))
+}
+
+/// Get the first player from a game (temporary workaround for session management)
+async fn get_first_player(
+    session_manager: &Arc<dyn planning_poker_session::SessionManager>,
+    game_id: Uuid,
+) -> Result<(Uuid, String), RouteError> {
+    let players = session_manager
+        .get_game_players(game_id)
+        .await
+        .unwrap_or_default();
+
+    players.first().map_or_else(
+        || Err(RouteError::RouteFailed("No players in game".to_string())),
+        |first_player| Ok((first_player.id, first_player.name.clone())),
+    )
+}
+
+/// Send vote result updates via SSE
+async fn send_vote_updates(
+    session_manager: &Arc<dyn planning_poker_session::SessionManager>,
+    game_id: Uuid,
+    game_id_str: &str,
+) {
+    if let Ok(votes) = session_manager.get_game_votes(game_id).await {
+        if let Ok(Some(game)) = session_manager.get_game(game_id).await {
+            let revealed = matches!(game.state, GameState::Revealed);
+            tracing::info!(
+                "Updating vote results: {} votes, revealed: {}",
+                votes.len(),
+                revealed
+            );
+            update_vote_results(game_id_str, votes, revealed).await;
+        }
+    }
+}
+
 /// Handles the vote route
 ///
 /// # Errors
@@ -764,33 +762,20 @@ pub async fn join_game_api_route(
 /// # Panics
 ///
 /// * Infallible
-pub async fn vote_route(
-    req: RouteRequest,
-    session_manager: Arc<dyn SessionManager>,
-) -> Result<Content, RouteError> {
+pub async fn vote_route(req: RouteRequest) -> Result<Content, RouteError> {
     if !matches!(req.method, Method::Post) {
         return Err(RouteError::UnsupportedMethod);
     }
 
-    // Extract game_id from path like "/api/games/uuid-here/vote"
-    let path_parts: Vec<&str> = req.path.split('/').collect();
-    let game_id_str = path_parts.get(3).unwrap_or(&"");
-    let game_id = Uuid::parse_str(game_id_str)?;
-
-    // Parse form data instead of JSON
+    let (game_id, game_id_str) = extract_game_id_from_path(&req.path)?;
     let form_data = req.parse_form::<VoteForm>()?;
 
-    // TODO: Get actual player ID from session management
-    // For now, use the first player in the game as a workaround
-    let players = session_manager
-        .get_game_players(game_id)
+    let session_manager = STATE
+        .get_session_manager()
         .await
-        .unwrap_or_default();
-    let (player_id, player_name) = if let Some(first_player) = players.first() {
-        (first_player.id, first_player.name.clone())
-    } else {
-        return Err(RouteError::RouteFailed("No players in game".to_string()));
-    };
+        .map_err(|e| RouteError::RouteFailed(format!("Database connection failed: {e}")))?;
+
+    let (player_id, player_name) = get_first_player(session_manager, game_id).await?;
 
     let vote = Vote {
         player_id,
@@ -798,6 +783,7 @@ pub async fn vote_route(
         value: form_data.vote,
         cast_at: Utc::now(),
     };
+
     match session_manager.cast_vote(game_id, vote).await {
         Ok(()) => {
             tracing::info!(
@@ -805,20 +791,8 @@ pub async fn vote_route(
                 game_id
             );
 
-            // Send partial updates via SSE instead of returning full page
-            if let Ok(votes) = session_manager.get_game_votes(game_id).await {
-                if let Ok(Some(game)) = session_manager.get_game(game_id).await {
-                    let revealed = matches!(game.state, GameState::Revealed);
-                    tracing::info!(
-                        "Updating vote results: {} votes, revealed: {}",
-                        votes.len(),
-                        revealed
-                    );
-                    update_vote_results(game_id_str, votes, revealed).await;
-                }
-            }
+            send_vote_updates(session_manager, game_id, game_id_str).await;
 
-            // Return minimal success response
             let success_content = container! {
                 div { "Vote cast successfully" }
             };
@@ -842,10 +816,7 @@ pub async fn vote_route(
 ///
 /// * Infallible
 #[allow(clippy::cognitive_complexity)]
-pub async fn reveal_votes_route(
-    req: RouteRequest,
-    session_manager: Arc<dyn SessionManager>,
-) -> Result<Content, RouteError> {
+pub async fn reveal_votes_route(req: RouteRequest) -> Result<Content, RouteError> {
     if !matches!(req.method, Method::Post) {
         return Err(RouteError::UnsupportedMethod);
     }
@@ -854,6 +825,12 @@ pub async fn reveal_votes_route(
     let path_parts: Vec<&str> = req.path.split('/').collect();
     let game_id_str = path_parts.get(3).unwrap_or(&"");
     let game_id = Uuid::parse_str(game_id_str)?;
+
+    // Get session manager from global state
+    let session_manager = STATE
+        .get_session_manager()
+        .await
+        .map_err(|e| RouteError::RouteFailed(format!("Database connection failed: {e}")))?;
 
     // Reveal the votes first
     match session_manager.reveal_votes(game_id).await {
@@ -916,10 +893,7 @@ pub async fn reveal_votes_route(
 ///
 /// * Infallible
 #[allow(clippy::cognitive_complexity)]
-pub async fn start_voting_route(
-    req: RouteRequest,
-    session_manager: Arc<dyn SessionManager>,
-) -> Result<Content, RouteError> {
+pub async fn start_voting_route(req: RouteRequest) -> Result<Content, RouteError> {
     if !matches!(req.method, Method::Post) {
         return Err(RouteError::UnsupportedMethod);
     }
@@ -930,6 +904,12 @@ pub async fn start_voting_route(
     let game_id = Uuid::parse_str(game_id_str)?;
 
     tracing::info!("START VOTING: Received request for game {}", game_id);
+
+    // Get session manager from global state
+    let session_manager = STATE
+        .get_session_manager()
+        .await
+        .map_err(|e| RouteError::RouteFailed(format!("Database connection failed: {e}")))?;
 
     // Check current game state before starting voting
     if let Ok(Some(game)) = session_manager.get_game(game_id).await {
@@ -1007,10 +987,7 @@ pub async fn start_voting_route(
 ///
 /// * Infallible
 #[allow(clippy::cognitive_complexity)]
-pub async fn reset_voting_route(
-    req: RouteRequest,
-    session_manager: Arc<dyn SessionManager>,
-) -> Result<Content, RouteError> {
+pub async fn reset_voting_route(req: RouteRequest) -> Result<Content, RouteError> {
     if !matches!(req.method, Method::Post) {
         return Err(RouteError::UnsupportedMethod);
     }
@@ -1019,6 +996,12 @@ pub async fn reset_voting_route(
     let path_parts: Vec<&str> = req.path.split('/').collect();
     let game_id_str = path_parts.get(3).unwrap_or(&"");
     let game_id = Uuid::parse_str(game_id_str)?;
+
+    // Get session manager from global state
+    let session_manager = STATE
+        .get_session_manager()
+        .await
+        .map_err(|e| RouteError::RouteFailed(format!("Database connection failed: {e}")))?;
 
     match session_manager.reset_voting(game_id).await {
         Ok(()) => {
@@ -1070,9 +1053,6 @@ mod tests {
     use super::*;
     use bytes::Bytes;
     use hyperchad::router::{RequestInfo, RouteRequest};
-    use planning_poker_config::Config;
-    use planning_poker_database::{create_connection, DatabaseConfig};
-    use planning_poker_session::DatabaseSessionManager;
     use std::collections::BTreeMap;
     use std::sync::Arc;
 
@@ -1106,24 +1086,8 @@ mod tests {
             body: Some(Arc::new(body)),
         };
 
-        // Set up database connection
-        let config = Config::default();
-        let database_url = config
-            .database_url
-            .unwrap_or_else(|| "sqlite://planning_poker.db".to_string());
-
-        let db_config = DatabaseConfig {
-            database_url,
-            max_connections: 10,
-            connection_timeout: std::time::Duration::from_secs(30),
-        };
-
-        let db = create_connection(db_config).await.unwrap();
-        let session_manager = Arc::new(DatabaseSessionManager::new(db));
-        session_manager.init_schema().await.unwrap();
-
         // Test that the form parsing works
-        let result = join_game_route(req, session_manager).await;
+        let result = join_game_route(req).await;
 
         // The result should be an error because UUID parsing will fail for "test-game-123"
         // but it should get past the form parsing stage
