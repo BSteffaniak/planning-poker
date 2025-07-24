@@ -159,14 +159,34 @@ pub const SQLITE_MIGRATIONS: Migrations = Migrations {
     directory: &include_dir::include_dir!("$CARGO_MANIFEST_DIR/migrations/sqlite"),
 };
 
+// Embedded migrations for PostgreSQL
+#[cfg(feature = "postgres")]
+pub const POSTGRES_MIGRATIONS: Migrations = Migrations {
+    directory: &include_dir::include_dir!("$CARGO_MANIFEST_DIR/migrations/postgres"),
+};
+
 /// Main migration function for the planning poker database
 ///
 /// # Errors
 ///
 /// Returns `MigrateError` if any migration fails to execute
-#[cfg(feature = "sqlite")]
+#[allow(clippy::cognitive_complexity)]
 pub async fn migrate(db: &dyn Database) -> Result<(), MigrateError> {
-    SQLITE_MIGRATIONS.run(db).await
+    #[cfg(feature = "postgres")]
+    {
+        tracing::debug!("migrate: running postgres migrations");
+        POSTGRES_MIGRATIONS.run(db).await?;
+        tracing::debug!("migrate: finished running postgres migrations");
+    }
+
+    #[cfg(feature = "sqlite")]
+    {
+        tracing::debug!("migrate: running sqlite migrations");
+        SQLITE_MIGRATIONS.run(db).await?;
+        tracing::debug!("migrate: finished running sqlite migrations");
+    }
+
+    Ok(())
 }
 
 /// Migration function that runs up to a specific migration
@@ -174,12 +194,26 @@ pub async fn migrate(db: &dyn Database) -> Result<(), MigrateError> {
 /// # Errors
 ///
 /// Returns `MigrateError` if any migration fails to execute
-#[cfg(feature = "sqlite")]
+#[allow(clippy::cognitive_complexity)]
 pub async fn migrate_until(
     db: &dyn Database,
     migration_name: Option<&str>,
 ) -> Result<(), MigrateError> {
-    SQLITE_MIGRATIONS.run_until(db, migration_name).await
+    #[cfg(feature = "postgres")]
+    {
+        tracing::debug!("migrate_until: running postgres migrations");
+        POSTGRES_MIGRATIONS.run_until(db, migration_name).await?;
+        tracing::debug!("migrate_until: finished running postgres migrations");
+    }
+
+    #[cfg(feature = "sqlite")]
+    {
+        tracing::debug!("migrate_until: running sqlite migrations");
+        SQLITE_MIGRATIONS.run_until(db, migration_name).await?;
+        tracing::debug!("migrate_until: finished running sqlite migrations");
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -193,6 +227,10 @@ mod tests {
         {
             assert!(SQLITE_MIGRATIONS.directory.dirs().count() > 0);
         }
+        #[cfg(feature = "postgres")]
+        {
+            assert!(POSTGRES_MIGRATIONS.directory.dirs().count() > 0);
+        }
     }
 
     #[test]
@@ -200,6 +238,28 @@ mod tests {
         #[cfg(feature = "sqlite")]
         {
             for migration_dir in SQLITE_MIGRATIONS.directory.dirs() {
+                let migration_name = migration_dir.path().file_name().unwrap().to_string_lossy();
+
+                // Check that up.sql exists
+                let up_file_path = format!("{migration_name}/up.sql");
+                assert!(
+                    migration_dir.get_file(&up_file_path).is_some(),
+                    "Missing up.sql for migration: {migration_name}"
+                );
+
+                // down.sql is optional but if it exists, it should be valid UTF-8
+                let down_file_path = format!("{migration_name}/down.sql");
+                if let Some(down_file) = migration_dir.get_file(&down_file_path) {
+                    assert!(
+                        down_file.contents_utf8().is_some(),
+                        "Invalid UTF-8 in down.sql for migration: {migration_name}"
+                    );
+                }
+            }
+        }
+        #[cfg(feature = "postgres")]
+        {
+            for migration_dir in POSTGRES_MIGRATIONS.directory.dirs() {
                 let migration_name = migration_dir.path().file_name().unwrap().to_string_lossy();
 
                 // Check that up.sql exists
