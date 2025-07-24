@@ -1,9 +1,9 @@
 [package]
 authors     = { workspace = true }
-categories  = ["games", "web-programming", "gui"]
+categories  = ["games", "gui", "web-programming"]
 description = "Cross-platform planning poker application using HyperChad"
 edition     = { workspace = true }
-keywords    = ["planning-poker", "scrum", "agile", "estimation", "gui"]
+keywords    = ["agile", "estimation", "gui", "planning-poker", "scrum"]
 license     = { workspace = true }
 name        = "planning_poker_app"
 readme      = "../../README.md"
@@ -14,8 +14,13 @@ version     = "0.1.0"
 name = "planning-poker-app"
 path = "src/main.rs"
 
+[[bin]]
+name              = "planning-poker-app-lambda"
+path              = "src/lambda.rs"
+required-features = ["lambda", "vanilla-js"]
+
 [dependencies]
-anyhow = { workspace = true }
+bytes = { workspace = true }
 chrono = { workspace = true }
 hyperchad = { workspace = true, features = [
     "actions",
@@ -51,9 +56,6 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 uuid = { workspace = true }
 
-[dependencies.bytes]
-workspace = true
-
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt"] }
 
@@ -70,9 +72,7 @@ vanilla-js = [
     "hyperchad/renderer-vanilla-js-plugin-routing",
     "hyperchad/renderer-vanilla-js-plugin-sse",
     "hyperchad/renderer-vanilla-js-plugin-uuid",
-    "web",
 ]
-web = ["hyperchad/renderer-html", "hyperchad/renderer-html-actix"]
 
 postgres = ["planning_poker_database/postgres"]
 sqlite   = ["planning_poker_database/sqlite"]

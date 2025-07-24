@@ -3,8 +3,16 @@
 #![allow(clippy::multiple_crate_versions)]
 
 use planning_poker_app::{build_app, init, set_renderer, setup_database};
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use tracing::info;
+
+static RUNTIME: LazyLock<Arc<switchy::unsync::runtime::Runtime>> = LazyLock::new(|| {
+    let runtime = switchy::unsync::runtime::Builder::new()
+        .max_blocking_threads(64)
+        .build()
+        .unwrap();
+    Arc::new(runtime)
+});
 
 #[allow(clippy::cognitive_complexity)]
 fn main() -> Result<(), hyperchad::app::Error> {
@@ -13,21 +21,13 @@ fn main() -> Result<(), hyperchad::app::Error> {
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
 
-    info!("Starting Planning Poker App");
-
-    // Create runtime like MoosicBox does
-    let runtime = switchy::unsync::runtime::Builder::new()
-        .max_blocking_threads(64)
-        .build()
-        .unwrap();
-
-    let runtime = Arc::new(runtime);
+    info!("Starting Planning Poker Lambda");
 
     // Set up database first (this needs to be async)
-    let session_manager = runtime.block_on(async { setup_database().await })?;
+    let session_manager = RUNTIME.block_on(async { setup_database().await })?;
 
     // Initialize app builder (synchronous like MoosicBox)
-    let app_builder = init().with_runtime_handle(runtime.handle().clone());
+    let app_builder = init().with_runtime_handle(RUNTIME.handle().clone());
 
     // Build app with session manager
     let app = build_app(app_builder, &session_manager)?;
@@ -37,8 +37,9 @@ fn main() -> Result<(), hyperchad::app::Error> {
     set_renderer(renderer);
     info!("Renderer set successfully");
 
-    info!("Running hyperchad app with built-in CLI");
-    app.run()?;
+    // Lambda mode: call handle_serve() directly like MoosicBox does
+    info!("Starting Lambda handler");
+    app.handle_serve()?;
 
     Ok(())
 }

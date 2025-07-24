@@ -2,19 +2,22 @@
 #![warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
 #![allow(clippy::multiple_crate_versions)]
 
-use anyhow::Result;
 use chrono::Utc;
 use hyperchad::{
+    app::{renderer::DefaultRenderer, App, AppBuilder},
     renderer::{Content, PartialView, Renderer},
     router::{ParseError, RouteRequest, Router},
     template::{self as hyperchad_template, container, Containers},
     transformer::html::ParseError as HtmlParseError,
 };
+use planning_poker_config::Config;
+use planning_poker_database::{create_connection, DatabaseConfig};
 use planning_poker_models::{GameState, Player, Vote};
-use planning_poker_session::SessionManager;
+use planning_poker_session::{DatabaseSessionManager, SessionManager};
 use serde::Deserialize;
 use std::sync::{Arc, OnceLock};
 use switchy::http::models::Method;
+
 use uuid::Uuid;
 
 static RENDERER: OnceLock<Arc<dyn Renderer>> = OnceLock::new();
@@ -276,6 +279,81 @@ pub fn set_renderer(renderer: Arc<dyn Renderer>) {
     } else {
         tracing::info!("RENDERER successfully initialized");
     }
+}
+
+/// Initialize the app with common configuration (synchronous like `MoosicBox`)
+///
+/// # Panics
+///
+/// * If the `assets` feature is enabled and an asset fails to be initialized
+#[must_use]
+pub fn init() -> AppBuilder {
+    // Build hyperchad app builder - following MoosicBox pattern
+    #[cfg_attr(not(feature = "assets"), allow(unused_mut))]
+    let mut app_builder = AppBuilder::new()
+        .with_title("Planning Poker".to_string())
+        .with_description("A planning poker application".to_string())
+        .with_size(800.0, 600.0);
+
+    #[cfg(feature = "assets")]
+    {
+        for asset in assets::ASSETS.iter().cloned() {
+            tracing::trace!("Adding static asset route: {asset:?}");
+            app_builder = app_builder.with_static_asset_route_result(asset).unwrap();
+        }
+    }
+
+    app_builder
+}
+
+/// Set up database and create session manager
+///
+/// # Errors
+///
+/// * If database connection fails
+/// * If schema initialization fails
+pub async fn setup_database() -> Result<Arc<dyn SessionManager>, hyperchad::app::Error> {
+    // Set up database connection
+    let config = Config::default();
+    let database_url = config
+        .database_url
+        .unwrap_or_else(|| "sqlite://planning_poker.db".to_string());
+
+    let db_config = DatabaseConfig {
+        database_url,
+        max_connections: 10,
+        connection_timeout: std::time::Duration::from_secs(30),
+    };
+
+    // Create database connection and session manager
+    let db = create_connection(db_config).await.map_err(|e| {
+        hyperchad::app::Error::from(Box::new(e) as Box<dyn std::error::Error + Send>)
+    })?;
+    let session_manager = Arc::new(DatabaseSessionManager::new(db));
+
+    // Initialize database schema
+    session_manager
+        .init_schema()
+        .await
+        .map_err(|e| hyperchad::app::Error::from(Box::<dyn std::error::Error + Send>::from(e)))?;
+
+    Ok(session_manager as Arc<dyn SessionManager>)
+}
+
+/// Build the app from the configured builder
+///
+/// # Errors
+///
+/// * If app building fails
+pub fn build_app(
+    builder: AppBuilder,
+    session_manager: &Arc<dyn SessionManager>,
+) -> Result<App<DefaultRenderer>, hyperchad::app::Error> {
+    // Create router with planning poker routes and database access
+    let router = create_app_router(session_manager);
+
+    let app = builder.with_router(router).build_default()?;
+    Ok(app)
 }
 
 pub fn create_app_router(session_manager: &Arc<dyn SessionManager>) -> Router {
