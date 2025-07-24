@@ -3,7 +3,7 @@ authors     = { workspace = true }
 categories  = ["database"]
 description = "Database layer using switchy_database for planning poker"
 edition     = { workspace = true }
-keywords    = ["database", "sqlite", "postgres", "orm"]
+keywords    = ["database", "orm", "postgres", "sqlite"]
 license     = { workspace = true }
 name        = "planning_poker_database"
 readme      = "../../README.md"
@@ -19,7 +19,7 @@ url       = { workspace = true, optional = true }
 
 [features]
 default  = ["sqlite"]
-postgres = ["dep:url", "switchy/database-connection-postgres"]
+postgres = ["dep:url", "switchy/database-connection-postgres-sqlx"]
 sqlite   = ["switchy/database-connection-sqlite-rusqlite"]
 
 fail-on-warnings = []
