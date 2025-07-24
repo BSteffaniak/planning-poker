@@ -74,8 +74,11 @@ vanilla-js = [
     "hyperchad/renderer-vanilla-js-plugin-uuid",
 ]
 
-postgres = ["planning_poker_database/postgres"]
-sqlite   = ["planning_poker_database/sqlite"]
+postgres = [
+    "planning_poker_database/postgres",
+    "planning_poker_session/postgres",
+]
+sqlite = ["planning_poker_database/sqlite", "planning_poker_session/sqlite"]
 
 _sse = [
     "hyperchad/renderer-html-sse",

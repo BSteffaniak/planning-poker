@@ -1,9 +1,9 @@
 [package]
 authors     = { workspace = true }
-categories  = ["web-programming", "database"]
+categories  = ["database", "web-programming"]
 description = "Session management and persistence"
 edition     = { workspace = true }
-keywords    = ["session", "persistence", "database", "planning-poker"]
+keywords    = ["database", "persistence", "planning-poker", "session"]
 license     = { workspace = true }
 name        = "planning_poker_session"
 readme      = "../../README.md"
@@ -16,13 +16,15 @@ async-trait             = { workspace = true }
 chrono                  = { workspace = true }
 planning_poker_database = { workspace = true }
 planning_poker_models   = { workspace = true }
-planning_poker_schema   = { workspace = true, features = ["sqlite"] }
+planning_poker_schema   = { workspace = true }
 switchy                 = { workspace = true, features = ["database"] }
 tracing                 = { workspace = true }
 uuid                    = { workspace = true }
 
 [features]
-default = []
+default = ["postgres", "sqlite"]
 
 fail-on-warnings = []
 
+postgres = ["planning_poker_schema/postgres"]
+sqlite   = ["planning_poker_schema/sqlite"]
