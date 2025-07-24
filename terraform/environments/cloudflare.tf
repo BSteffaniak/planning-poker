@@ -7,10 +7,10 @@ resource "cloudflare_record" "main" {
   proxied = false  # DNS-only, no CDN proxy - direct to CloudFront
   ttl     = 300    # 5 minutes
 
-  comment = "Planning Poker ${var.environment} environment - points to CloudFront"
+  comment = "Planning Poker ${terraform.workspace} environment - points to CloudFront"
 }
 
 # Local value for subdomain name (without the base domain)
 locals {
-  subdomain_name = var.environment == "prod" ? "planning-poker" : "${var.environment}.planning-poker"
+  subdomain_name = terraform.workspace == "prod" ? "planning-poker" : "${terraform.workspace}.planning-poker"
 }

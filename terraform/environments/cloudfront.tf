@@ -1,6 +1,6 @@
 # CloudFront Origin Access Control for S3
 resource "aws_cloudfront_origin_access_control" "s3" {
-  name                              = "planning-poker-${var.environment}-s3-oac"
+  name                              = "planning-poker-${terraform.workspace}-s3-oac"
   description                       = "OAC for Planning Poker S3 bucket"
   origin_access_control_origin_type = "s3"
   signing_behavior                  = "always"
@@ -26,7 +26,7 @@ resource "aws_cloudfront_distribution" "main" {
   # Lambda origin for dynamic routes
   origin {
     domain_name = regex("https://([^/]+)", aws_lambda_function_url.app.function_url)[0]
-    origin_id   = "Lambda-${var.debug_mode ? aws_lambda_function.app_debug[0].function_name : aws_lambda_function.app_release[0].function_name}"
+    origin_id   = "Lambda-${local.lambda_function_name}"
 
     custom_origin_config {
       http_port              = 80
@@ -45,7 +45,7 @@ resource "aws_cloudfront_distribution" "main" {
   default_cache_behavior {
     allowed_methods        = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
     cached_methods         = ["GET", "HEAD"]
-    target_origin_id       = "Lambda-${var.debug_mode ? aws_lambda_function.app_debug[0].function_name : aws_lambda_function.app_release[0].function_name}"
+    target_origin_id       = "Lambda-${local.lambda_function_name}"
     compress               = true
     viewer_protocol_policy = "redirect-to-https"
 
@@ -111,7 +111,7 @@ resource "aws_cloudfront_distribution" "main" {
       path_pattern           = ordered_cache_behavior.value
       allowed_methods        = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
       cached_methods         = ["GET", "HEAD"]
-      target_origin_id       = "Lambda-${var.debug_mode ? aws_lambda_function.app_debug[0].function_name : aws_lambda_function.app_release[0].function_name}"
+      target_origin_id       = "Lambda-${local.lambda_function_name}"
       compress               = true
       viewer_protocol_policy = "redirect-to-https"
 

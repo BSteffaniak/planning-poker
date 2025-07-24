@@ -44,12 +44,16 @@ data "cloudflare_zone" "main" {
 
 # Local values
 locals {
-  environment = var.environment
-  subdomain   = var.environment == "prod" ? "planning-poker.hyperchad.dev" : "${var.environment}.planning-poker.hyperchad.dev"
-  bucket_name = "planning-poker-${var.environment}-${random_id.suffix.hex}"
+  environment = terraform.workspace
+  is_prod     = terraform.workspace == "prod"
+  subdomain   = local.is_prod ? "planning-poker.hyperchad.dev" : "${terraform.workspace}.planning-poker.hyperchad.dev"
+  bucket_name = "planning-poker-${terraform.workspace}-${random_id.suffix.hex}"
+
+  # Lambda function name abstraction for debug/release modes
+  lambda_function_name = var.debug_mode ? aws_lambda_function.app_debug[0].function_name : aws_lambda_function.app_release[0].function_name
 
   common_tags = {
-    Environment = var.environment
+    Environment = terraform.workspace
     Project     = "planning-poker"
     ManagedBy   = "terraform"
   }

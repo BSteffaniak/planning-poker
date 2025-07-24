@@ -1,7 +1,7 @@
 # S3 bucket for Lambda packages (debug mode only)
 resource "aws_s3_bucket" "lambda_packages" {
   count  = var.debug_mode ? 1 : 0
-  bucket = "planning-poker-lambda-${var.environment}-${random_id.suffix.hex}"
+  bucket = "planning-poker-lambda-${terraform.workspace}-${random_id.suffix.hex}"
   tags   = local.common_tags
 }
 
@@ -26,7 +26,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "lambda_packages" 
 
 # IAM role for Lambda function
 resource "aws_iam_role" "lambda" {
-  name = "planning-poker-lambda-${var.environment}"
+  name = "planning-poker-lambda-${terraform.workspace}"
   tags = local.common_tags
 
   assume_role_policy = jsonencode({
@@ -91,7 +91,7 @@ resource "aws_lambda_function" "app_release" {
 
   filename         = "${path.module}/../../target/lambda/planning-poker-app-lambda/bootstrap.zip"
 
-  function_name    = "planning-poker-${var.environment}"
+  function_name    = "planning-poker-${terraform.workspace}"
   role            = aws_iam_role.lambda.arn
   handler         = "bootstrap"
   runtime         = "provided.al2023"
@@ -103,7 +103,7 @@ resource "aws_lambda_function" "app_release" {
   environment {
     variables = merge(
       {
-        ENVIRONMENT = var.environment
+        ENVIRONMENT = terraform.workspace
         RUST_LOG    = var.enable_debug_logging ? "planning_poker=debug,hyperchad=debug" : "planning_poker=info"
       },
       var.database_url != null ? { DATABASE_URL = var.database_url } : {},
@@ -126,7 +126,7 @@ resource "aws_lambda_function" "app_debug" {
   s3_key           = aws_s3_object.lambda_package[0].key
   s3_object_version = aws_s3_object.lambda_package[0].version_id
 
-  function_name    = "planning-poker-${var.environment}"
+  function_name    = "planning-poker-${terraform.workspace}"
   role            = aws_iam_role.lambda.arn
   handler         = "bootstrap"
   runtime         = "provided.al2023"
@@ -138,7 +138,7 @@ resource "aws_lambda_function" "app_debug" {
   environment {
     variables = merge(
       {
-        ENVIRONMENT = var.environment
+        ENVIRONMENT = terraform.workspace
         RUST_LOG    = "debug"
         RUST_BACKTRACE = "full"
       },
@@ -163,10 +163,12 @@ resource "aws_lambda_function" "app_debug" {
 # Lambda function URL (for API Gateway integration)
 resource "aws_lambda_function_url" "app" {
   depends_on = [
-    terraform_data.build_lambda
+    terraform_data.build_lambda,
+    aws_lambda_function.app_debug,
+    aws_lambda_function.app_release
   ]
 
-  function_name      = var.debug_mode ? aws_lambda_function.app_debug[0].function_name : aws_lambda_function.app_release[0].function_name
+  function_name      = local.lambda_function_name
   authorization_type = "NONE"
 
   cors {

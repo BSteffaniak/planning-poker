@@ -1,7 +1,7 @@
 # Build static assets
 resource "terraform_data" "build_static" {
   triggers_replace = {
-    environment     = var.environment
+    environment     = terraform.workspace
     cargo_toml      = filemd5("${path.module}/../../Cargo.toml")
     app_cargo_toml  = filemd5("${path.module}/../../packages/app/Cargo.toml")
     app_src_files   = md5(join("", [for f in fileset("${path.module}/../../packages/app/src", "**/*.rs") : filemd5("${path.module}/../../packages/app/src/${f}")]))
@@ -10,7 +10,7 @@ resource "terraform_data" "build_static" {
   provisioner "local-exec" {
     command = "bash ${path.module}/../scripts/build-static.sh"
     environment = {
-      ENVIRONMENT = var.environment
+      ENVIRONMENT = terraform.workspace
       OUTPUT_DIR  = "${path.module}/../../packages/app/gen"
     }
     working_dir = path.module
@@ -20,7 +20,7 @@ resource "terraform_data" "build_static" {
 # Build Lambda function
 resource "terraform_data" "build_lambda" {
   triggers_replace = {
-    environment     = var.environment
+    environment     = terraform.workspace
     debug_mode      = var.debug_mode
     cargo_toml      = filemd5("${path.module}/../../Cargo.toml")
     app_cargo_toml  = filemd5("${path.module}/../../packages/app/Cargo.toml")
@@ -30,7 +30,7 @@ resource "terraform_data" "build_lambda" {
   provisioner "local-exec" {
     command = "bash ${path.module}/../scripts/build-lambda.sh"
     environment = {
-      ENVIRONMENT = var.environment
+      ENVIRONMENT = terraform.workspace
       DEBUG_MODE  = var.debug_mode ? "true" : "false"
     }
     working_dir = path.module
@@ -46,7 +46,7 @@ resource "terraform_data" "upload_assets" {
   ]
 
   triggers_replace = {
-    environment     = var.environment
+    environment     = terraform.workspace
     debug_mode      = var.debug_mode
     cargo_toml      = filemd5("${path.module}/../../Cargo.toml")
     app_cargo_toml  = filemd5("${path.module}/../../packages/app/Cargo.toml")

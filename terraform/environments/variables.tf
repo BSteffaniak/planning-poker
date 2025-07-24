@@ -1,12 +1,3 @@
-variable "environment" {
-  description = "Environment name (dev, staging, prod, or feature branch name)"
-  type        = string
-
-  validation {
-    condition     = can(regex("^[a-z0-9-]+$", var.environment))
-    error_message = "Environment must contain only lowercase letters, numbers, and hyphens."
-  }
-}
 
 variable "lambda_environment_variables" {
   description = "Environment variables for the Lambda function"
