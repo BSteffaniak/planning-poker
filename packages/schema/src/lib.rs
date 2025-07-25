@@ -179,8 +179,8 @@ pub const POSTGRES_MIGRATIONS: Migrations = Migrations {
 /// # Errors
 ///
 /// Returns `MigrateError` if any migration fails to execute
-#[allow(clippy::cognitive_complexity)]
-pub async fn migrate(db: &dyn Database) -> Result<(), MigrateError> {
+#[allow(clippy::cognitive_complexity, clippy::unused_async)]
+pub async fn migrate(#[allow(unused)] db: &dyn Database) -> Result<(), MigrateError> {
     #[cfg(feature = "postgres")]
     {
         tracing::debug!("migrate: running postgres migrations");
@@ -203,10 +203,10 @@ pub async fn migrate(db: &dyn Database) -> Result<(), MigrateError> {
 /// # Errors
 ///
 /// Returns `MigrateError` if any migration fails to execute
-#[allow(clippy::cognitive_complexity)]
+#[allow(clippy::cognitive_complexity, clippy::unused_async)]
 pub async fn migrate_until(
-    db: &dyn Database,
-    migration_name: Option<&str>,
+    #[allow(unused)] db: &dyn Database,
+    #[allow(unused)] migration_name: Option<&str>,
 ) -> Result<(), MigrateError> {
     #[cfg(feature = "postgres")]
     {

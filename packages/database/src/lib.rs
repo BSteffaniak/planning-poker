@@ -4,8 +4,14 @@
 
 use anyhow::Result;
 pub use switchy::database::Database;
-use switchy::database_connection::{init, InitDbError};
+use switchy::database_connection::InitDbError;
 use thiserror::Error;
+
+// Re-export switchy::database types for convenience
+pub use switchy::database::{
+    query::{DeleteStatement, InsertStatement, SelectQuery, UpdateStatement, UpsertStatement},
+    DatabaseValue, Row, TryFromDb, TryFromError,
+};
 
 #[derive(Error, Debug)]
 pub enum DatabaseError {
@@ -43,6 +49,7 @@ impl Default for DatabaseConfig {
 /// # Panics
 ///
 /// Panics if the `SQLite` URL prefix cannot be stripped (this should never happen if the URL starts with "sqlite://")
+#[allow(clippy::unused_async)]
 pub async fn create_connection(config: DatabaseConfig) -> Result<Box<dyn Database>, DatabaseError> {
     tracing::info!(
         "Creating database connection with URL: {}",
@@ -59,7 +66,7 @@ pub async fn create_connection(config: DatabaseConfig) -> Result<Box<dyn Databas
                 Some(std::path::Path::new(path_str))
             };
 
-            let db = init(path, None).await?;
+            let db = switchy::database_connection::init(path, None).await?;
             Ok(db)
         }
         #[cfg(not(feature = "sqlite"))]
@@ -106,7 +113,7 @@ pub async fn create_connection(config: DatabaseConfig) -> Result<Box<dyn Databas
                 username,
                 password,
             );
-            let db = init(
+            let db = switchy::database_connection::init(
                 #[cfg(feature = "sqlite")]
                 None,
                 Some(creds),
@@ -127,9 +134,3 @@ pub async fn create_connection(config: DatabaseConfig) -> Result<Box<dyn Databas
         )))
     }
 }
-
-// Re-export switchy::database types for convenience
-pub use switchy::database::{
-    query::{DeleteStatement, InsertStatement, SelectQuery, UpdateStatement, UpsertStatement},
-    DatabaseValue, Row, TryFromDb, TryFromError,
-};
