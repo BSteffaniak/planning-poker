@@ -9,6 +9,6 @@ tofu taint terraform_data.build_static
 tofu taint terraform_data.upload_assets
 
 echo "Applying changes..."
-tofu apply
+tofu apply -auto-approve
 
 echo "✅ Redeploy complete!"
