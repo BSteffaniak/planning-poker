@@ -1,0 +1,602 @@
+name: Auto-upgrade Dependencies
+
+on:
+    workflow_dispatch:
+    schedule:
+        - cron: "0 6 * * *"
+
+env:
+    CARGO_TERM_COLOR: always
+
+jobs:
+    upgrade-compatible:
+        name: Upgrade compatible dependencies
+        runs-on: ubuntu-latest
+        outputs:
+            upgraded: ${{ steps.upgrade.outputs.upgraded }}
+            branch-name: ${{ steps.branch.outputs.name }}
+            incompatible-branch: ${{ steps.branch.outputs.incompatible }}
+        steps:
+            - name: Checkout planning-poker
+              uses: actions/checkout@v4
+              with:
+                  path: planning-poker
+                  token: ${{ secrets.GITHUB_TOKEN }}
+                  fetch-depth: 0
+
+            - name: Checkout MoosicBox
+              uses: actions/checkout@v4
+              with:
+                  repository: MoosicBox/MoosicBox
+                  path: MoosicBox
+
+            - name: Setup branch name with retry handling
+              id: branch
+              run: |
+                  BRANCH_DATE=$(date +%Y%m%d%H%M%S)
+                  BASE_BRANCH="auto-upgrade-${BRANCH_DATE}-${{ github.run_id }}"
+
+                  # Build retry suffix if not first attempt
+                  RETRY_SUFFIX=""
+                  if [ "${{ github.run_attempt }}" -gt 1 ]; then
+                    RETRY_SUFFIX="-${{ github.run_attempt }}"
+                  fi
+
+                  BRANCH_NAME="${BASE_BRANCH}${RETRY_SUFFIX}"
+                  INCOMPATIBLE_BRANCH="${BASE_BRANCH}-incompatible${RETRY_SUFFIX}"
+
+                  echo "name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+                  echo "incompatible=$INCOMPATIBLE_BRANCH" >> $GITHUB_OUTPUT
+
+                  echo "Using branch: $BRANCH_NAME"
+                  echo "Incompatible branch: $INCOMPATIBLE_BRANCH"
+
+            - uses: dtolnay/rust-toolchain@stable
+              with:
+                  components: rustfmt, clippy
+
+            - name: Install cargo-edit
+              shell: bash
+              run: |
+                  cargo install \
+                      -f cargo-edit \
+                      --git https://github.com/BSteffaniak/cargo-edit \
+                      --branch add-skip-git-dependencies
+
+            - name: Create upgrade branch
+              working-directory: planning-poker
+              run: |
+                  git config user.name "PlanningPokerBot"
+                  git config user.email "PlanningPokerBot@gmail.com"
+                  git checkout -b ${{ steps.branch.outputs.name }}
+
+            - name: Upgrade compatible dependencies
+              id: upgrade
+              working-directory: planning-poker
+              shell: bash
+              run: |
+                  cargo upgrade --skip-git-dependencies
+                  cargo update
+                  if [ -n "$(git status --porcelain)" ]; then
+                      echo "Found upgrades"
+                      git add .
+                      git commit --message "Upgrade compatible Cargo dependencies"
+                      git push origin ${{ steps.branch.outputs.name }}
+                      echo "upgraded=true" >> "$GITHUB_OUTPUT"
+                  else
+                      echo "No upgrades"
+                      echo "upgraded=false" >> "$GITHUB_OUTPUT"
+                  fi
+
+    validate-compatible:
+        name: Validate compatible upgrades
+        runs-on: ubuntu-latest
+        needs: [upgrade-compatible]
+        if: ${{ needs.upgrade-compatible.outputs.upgraded == 'true' }}
+        outputs:
+            matrix: ${{ steps.build-matrix.outputs.matrix }}
+        steps:
+            - name: Checkout planning-poker
+              uses: actions/checkout@v4
+              with:
+                  path: planning-poker
+                  fetch-depth: 0
+
+            - name: Checkout MoosicBox
+              uses: actions/checkout@v4
+              with:
+                  repository: MoosicBox/MoosicBox
+                  path: MoosicBox
+
+            - name: Checkout upgrade branch
+              working-directory: planning-poker
+              run: |
+                  git fetch origin ${{ needs.upgrade-compatible.outputs.branch-name }}
+                  git checkout ${{ needs.upgrade-compatible.outputs.branch-name }}
+
+            - uses: dtolnay/rust-toolchain@stable
+
+            - name: Setup clippier
+              uses: BSteffaniak/cache-artifact@master
+              with:
+                  repo: https://github.com/MoosicBox/MoosicBox
+                  command: cargo install --git https://github.com/MoosicBox/MoosicBox clippier --features git-diff
+                  shell: bash
+                  output-path: ~/.cargo/bin/clippier
+                  artifact-name: clippier-ubuntu-binary
+                  cache-key-prefix: clippier
+                  make-executable: true
+                  verify-command: --version
+
+            - name: Build matrix for changed files
+              id: build-matrix
+              working-directory: planning-poker
+              run: |
+                  # Get changed files compared to master
+                  CHANGED_FILES=$(git diff --name-only origin/master | tr '\n' ',' | sed 's/,$//')
+                  echo "Changed files: $CHANGED_FILES"
+
+                  if [ -n "$CHANGED_FILES" ]; then
+                      MATRIX=$(
+                          ~/.cargo/bin/clippier \
+                              features \
+                              . \
+                              --changed-files "$CHANGED_FILES" \
+                              --git-base "origin/master" \
+                              --git-head "HEAD" \
+                              --chunked 15 \
+                              --max-parallel 256 \
+                              -o json \
+                              --spread \
+                              --skip-features fail-on-warnings \
+                              | jq -rc \
+                                  '[
+                                      .[]
+                                      | {
+                                          "name": (.name | sub("^(planning_poker|switchy|hyperchad)_"; "")),
+                                          "path": (.path),
+                                          "features": (.features),
+                                          "requiredFeatures": (if .requiredFeatures != null then .requiredFeatures | join(",") else null end),
+                                          "os": (.os + "-latest"),
+                                          "dependencies": (.dependencies),
+                                          "toolchains": (.toolchains),
+                                          "ciSteps": (.ciSteps),
+                                          "ciToolchains": (.ciToolchains),
+                                          "env": (if .env != null then .env | gsub("\n";" ") else null end),
+                                          "nightly": (.nightly)
+                                      }
+                                      | del(.. | nulls)
+                                  ]'
+                      )
+                  else
+                      MATRIX="[]"
+                  fi
+
+                  echo "Matrix:"
+                  echo $MATRIX | jq
+                  echo 'matrix<<EOF' >> $GITHUB_OUTPUT
+                  echo $MATRIX >> $GITHUB_OUTPUT
+                  echo 'EOF' >> $GITHUB_OUTPUT
+
+    test-compatible:
+        name: Test compatible upgrades
+        runs-on: ${{ matrix.package.os }}
+        needs: [upgrade-compatible, validate-compatible]
+        if: ${{ needs.upgrade-compatible.outputs.upgraded == 'true' && fromJson(needs.validate-compatible.outputs.matrix) != '[]' }}
+        strategy:
+            fail-fast: false
+            matrix:
+                package: ${{ fromJson(needs.validate-compatible.outputs.matrix) }}
+        steps:
+            - name: Checkout planning-poker
+              uses: actions/checkout@v4
+              with:
+                  path: planning-poker
+                  fetch-depth: 0
+
+            - name: Checkout MoosicBox
+              uses: actions/checkout@v4
+              with:
+                  repository: MoosicBox/MoosicBox
+                  path: MoosicBox
+
+            - name: Checkout upgrade branch
+              working-directory: planning-poker
+              run: |
+                  git fetch origin ${{ needs.upgrade-compatible.outputs.branch-name }}
+                  git checkout ${{ needs.upgrade-compatible.outputs.branch-name }}
+
+            - uses: dtolnay/rust-toolchain@stable
+              with:
+                  toolchain: ${{ matrix.package.nightly && 'nightly' || 'stable' }}
+                  components: rustfmt, clippy
+
+            - name: Setup cmake
+              uses: jwlawson/actions-setup-cmake@v2
+              with:
+                  cmake-version: "3.x"
+
+            - name: Setup CI
+              working-directory: planning-poker
+              if: ${{ matrix.package.ciSteps }}
+              run: ${{ matrix.package.ciSteps }}
+
+            - name: Install dependencies
+              working-directory: planning-poker
+              if: ${{ matrix.package.dependencies }}
+              run: ${{ matrix.package.dependencies }}
+
+            - name: Clippy ${{ matrix.package.name }}
+              working-directory: planning-poker
+              shell: bash
+              run: |
+                  (cd ${{ matrix.package.path }}; \
+                      while read -r feature; do \
+                          command="${{ matrix.package.env }} cargo${{ matrix.package.nightly && ' +nightly' || '' }} clippy ${{ runner.debug && '-vv ' }}--all-targets --no-default-features --features="fail-on-warnings${{ matrix.package.requiredFeatures && format(',{0}', matrix.package.requiredFeatures) || '' }},$feature" ${{ matrix.package.cargo }}"
+                          command=$(echo "$command" | xargs)
+                          echo "RUNNING \`$command\`"
+                          if ${{ matrix.package.env }} cargo${{ matrix.package.nightly && ' +nightly' || '' }} clippy \
+                              ${{ runner.debug && '-vv' }} \
+                              --all-targets \
+                              --no-default-features \
+                              --features="fail-on-warnings${{ matrix.package.requiredFeatures && format(',{0}', matrix.package.requiredFeatures) || '' }},$feature" ${{ matrix.package.cargo }}; then
+                              echo "SUCCESS \`$command\`";
+                          else
+                              >&2 echo "FAILED \`$command\`";
+                              >&2 echo "COMMAND: (cd ${{ matrix.package.path }}; $command)";
+                              return 1
+                          fi
+                      done <<<"$(echo '${{ toJson(matrix.package.features) }}' | jq -r '.[]')")
+
+            - name: Run ${{ matrix.package.name }} tests
+              working-directory: planning-poker
+              shell: bash
+              run: |
+                  (cd ${{ matrix.package.path }}; \
+                      while read -r feature; do \
+                          command="${{ matrix.package.env }} cargo${{ matrix.package.nightly && ' +nightly' || '' }} test --no-default-features --features="fail-on-warnings${{ matrix.package.requiredFeatures && format(',{0}', matrix.package.requiredFeatures) || '' }},$feature" ${{ matrix.package.cargo }}"
+                          command=$(echo "$command" | xargs)
+                          echo "RUNNING \`$command\`"
+                          if ${{ matrix.package.env }} cargo${{ matrix.package.nightly && ' +nightly' || '' }} test \
+                              ${{ runner.debug && '-vv' }} \
+                              --no-default-features \
+                              --features="fail-on-warnings${{ matrix.package.requiredFeatures && format(',{0}', matrix.package.requiredFeatures) || '' }},$feature" ${{ matrix.package.cargo }}; then
+                              echo "SUCCESS \`$command\`";
+                          else
+                              >&2 echo "FAILED \`$command\`";
+                              >&2 echo "COMMAND: (cd ${{ matrix.package.path }}; $command)";
+                              return 1
+                          fi
+                      done <<<"$(echo '${{ toJson(matrix.package.features) }}' | jq -r '.[]')")
+
+            - name: Format ${{ matrix.package.name }}
+              working-directory: planning-poker
+              shell: bash
+              run: |
+                  (cd ${{ matrix.package.path }}; ${{ matrix.package.env }} cargo${{ matrix.package.nightly && ' +nightly' || '' }} ${{ runner.debug && '-vv' }} fmt --all -- --check)
+
+    commit-compatible:
+        name: Commit compatible upgrades
+        runs-on: ubuntu-latest
+        needs: [upgrade-compatible, validate-compatible, test-compatible]
+        if: ${{ always() && needs.upgrade-compatible.outputs.upgraded == 'true' }}
+        steps:
+            - name: Checkout planning-poker
+              uses: actions/checkout@v4
+              with:
+                  path: planning-poker
+                  token: ${{ secrets.GITHUB_TOKEN }}
+                  fetch-depth: 0
+
+            - name: Checkout upgrade branch
+              working-directory: planning-poker
+              run: |
+                  git fetch origin ${{ needs.upgrade-compatible.outputs.branch-name }}
+                  git checkout ${{ needs.upgrade-compatible.outputs.branch-name }}
+
+            - name: Merge to master if tests passed
+              if: ${{ needs.test-compatible.result == 'success' || needs.validate-compatible.outputs.matrix == '[]' }}
+              working-directory: planning-poker
+              run: |
+                  git config user.name "PlanningPokerBot"
+                  git config user.email "PlanningPokerBot@gmail.com"
+                  git fetch origin master
+                  git rebase origin/master
+                  git checkout master
+                  git merge --ff-only ${{ needs.upgrade-compatible.outputs.branch-name }}
+                  git push origin master
+                  echo "✅ Compatible upgrades merged to master"
+
+            - name: Leave branch if tests failed
+              if: ${{ needs.test-compatible.result == 'failure' }}
+              run: |
+                  echo "❌ Tests failed - leaving branch ${{ needs.upgrade-compatible.outputs.branch-name }} for manual review"
+
+    upgrade-incompatible:
+        name: Upgrade incompatible dependencies
+        runs-on: ubuntu-latest
+        needs: [upgrade-compatible, commit-compatible]
+        if: ${{ always() && (needs.commit-compatible.result == 'success' || (needs.upgrade-compatible.outputs.upgraded == 'true' && needs.validate-compatible.outputs.matrix == '[]')) }}
+        outputs:
+            upgraded: ${{ steps.upgrade.outputs.upgraded }}
+        steps:
+            - name: Checkout planning-poker
+              uses: actions/checkout@v4
+              with:
+                  path: planning-poker
+                  token: ${{ secrets.GITHUB_TOKEN }}
+                  fetch-depth: 0
+
+            - name: Checkout MoosicBox
+              uses: actions/checkout@v4
+              with:
+                  repository: MoosicBox/MoosicBox
+                  path: MoosicBox
+
+            - name: Update to latest master
+              working-directory: planning-poker
+              run: |
+                  git fetch origin master
+                  git checkout master
+                  git pull origin master
+
+            - uses: dtolnay/rust-toolchain@stable
+              with:
+                  components: rustfmt, clippy
+
+            - name: Install cargo-edit
+              shell: bash
+              run: |
+                  cargo install \
+                      -f cargo-edit \
+                      --git https://github.com/BSteffaniak/cargo-edit \
+                      --branch add-skip-git-dependencies
+
+            - name: Create incompatible upgrade branch
+              working-directory: planning-poker
+              run: |
+                  git config user.name "PlanningPokerBot"
+                  git config user.email "PlanningPokerBot@gmail.com"
+                  git checkout -b ${{ needs.upgrade-compatible.outputs.incompatible-branch }}
+
+            - name: Upgrade incompatible dependencies
+              id: upgrade
+              working-directory: planning-poker
+              shell: bash
+              run: |
+                  cargo upgrade --skip-git-dependencies --incompatible
+                  cargo update
+                  if [ -n "$(git status --porcelain)" ]; then
+                      echo "Found incompatible upgrades"
+                      git add .
+                      git commit --message "Upgrade incompatible Cargo dependencies"
+                      git push origin ${{ needs.upgrade-compatible.outputs.incompatible-branch }}
+                      echo "upgraded=true" >> "$GITHUB_OUTPUT"
+                  else
+                      echo "No incompatible upgrades"
+                      echo "upgraded=false" >> "$GITHUB_OUTPUT"
+                  fi
+
+    validate-incompatible:
+        name: Validate incompatible upgrades
+        runs-on: ubuntu-latest
+        needs: [upgrade-compatible, upgrade-incompatible]
+        if: ${{ needs.upgrade-incompatible.outputs.upgraded == 'true' }}
+        outputs:
+            matrix: ${{ steps.build-matrix.outputs.matrix }}
+        steps:
+            - name: Checkout planning-poker
+              uses: actions/checkout@v4
+              with:
+                  path: planning-poker
+                  fetch-depth: 0
+
+            - name: Checkout MoosicBox
+              uses: actions/checkout@v4
+              with:
+                  repository: MoosicBox/MoosicBox
+                  path: MoosicBox
+
+            - name: Checkout incompatible upgrade branch
+              working-directory: planning-poker
+              run: |
+                  git fetch origin ${{ needs.upgrade-compatible.outputs.incompatible-branch }}
+                  git checkout ${{ needs.upgrade-compatible.outputs.incompatible-branch }}
+
+            - uses: dtolnay/rust-toolchain@stable
+
+            - name: Setup clippier
+              uses: BSteffaniak/cache-artifact@master
+              with:
+                  repo: https://github.com/MoosicBox/MoosicBox
+                  command: cargo install --git https://github.com/MoosicBox/MoosicBox clippier --features git-diff
+                  shell: bash
+                  output-path: ~/.cargo/bin/clippier
+                  artifact-name: clippier-ubuntu-binary
+                  cache-key-prefix: clippier
+                  make-executable: true
+                  verify-command: --version
+
+            - name: Build matrix for changed files
+              id: build-matrix
+              working-directory: planning-poker
+              run: |
+                  # Get changed files compared to master
+                  CHANGED_FILES=$(git diff --name-only origin/master | tr '\n' ',' | sed 's/,$//')
+                  echo "Changed files: $CHANGED_FILES"
+
+                  if [ -n "$CHANGED_FILES" ]; then
+                      MATRIX=$(
+                          ~/.cargo/bin/clippier \
+                              features \
+                              . \
+                              --changed-files "$CHANGED_FILES" \
+                              --git-base "origin/master" \
+                              --git-head "HEAD" \
+                              --chunked 15 \
+                              --max-parallel 256 \
+                              -o json \
+                              --spread \
+                              --skip-features fail-on-warnings \
+                              | jq -rc \
+                                  '[
+                                      .[]
+                                      | {
+                                          "name": (.name | sub("^(planning_poker|switchy|hyperchad)_"; "")),
+                                          "path": (.path),
+                                          "features": (.features),
+                                          "requiredFeatures": (if .requiredFeatures != null then .requiredFeatures | join(",") else null end),
+                                          "os": (.os + "-latest"),
+                                          "dependencies": (.dependencies),
+                                          "toolchains": (.toolchains),
+                                          "ciSteps": (.ciSteps),
+                                          "ciToolchains": (.ciToolchains),
+                                          "env": (if .env != null then .env | gsub("\n";" ") else null end),
+                                          "nightly": (.nightly)
+                                      }
+                                      | del(.. | nulls)
+                                  ]'
+                      )
+                  else
+                      MATRIX="[]"
+                  fi
+
+                  echo "Matrix:"
+                  echo $MATRIX | jq
+                  echo 'matrix<<EOF' >> $GITHUB_OUTPUT
+                  echo $MATRIX >> $GITHUB_OUTPUT
+                  echo 'EOF' >> $GITHUB_OUTPUT
+
+    test-incompatible:
+        name: Test incompatible upgrades
+        runs-on: ${{ matrix.package.os }}
+        needs: [upgrade-compatible, upgrade-incompatible, validate-incompatible]
+        if: ${{ needs.upgrade-incompatible.outputs.upgraded == 'true' && fromJson(needs.validate-incompatible.outputs.matrix) != '[]' }}
+        strategy:
+            fail-fast: false
+            matrix:
+                package: ${{ fromJson(needs.validate-incompatible.outputs.matrix) }}
+        steps:
+            - name: Checkout planning-poker
+              uses: actions/checkout@v4
+              with:
+                  path: planning-poker
+                  fetch-depth: 0
+
+            - name: Checkout MoosicBox
+              uses: actions/checkout@v4
+              with:
+                  repository: MoosicBox/MoosicBox
+                  path: MoosicBox
+
+            - name: Checkout incompatible upgrade branch
+              working-directory: planning-poker
+              run: |
+                  git fetch origin ${{ needs.upgrade-compatible.outputs.incompatible-branch }}
+                  git checkout ${{ needs.upgrade-compatible.outputs.incompatible-branch }}
+
+            - uses: dtolnay/rust-toolchain@stable
+              with:
+                  toolchain: ${{ matrix.package.nightly && 'nightly' || 'stable' }}
+                  components: rustfmt, clippy
+
+            - name: Setup cmake
+              uses: jwlawson/actions-setup-cmake@v2
+              with:
+                  cmake-version: "3.x"
+
+            - name: Setup CI
+              working-directory: planning-poker
+              if: ${{ matrix.package.ciSteps }}
+              run: ${{ matrix.package.ciSteps }}
+
+            - name: Install dependencies
+              working-directory: planning-poker
+              if: ${{ matrix.package.dependencies }}
+              run: ${{ matrix.package.dependencies }}
+
+            - name: Clippy ${{ matrix.package.name }}
+              working-directory: planning-poker
+              shell: bash
+              run: |
+                  (cd ${{ matrix.package.path }}; \
+                      while read -r feature; do \
+                          command="${{ matrix.package.env }} cargo${{ matrix.package.nightly && ' +nightly' || '' }} clippy --all-targets --no-default-features --features="fail-on-warnings${{ matrix.package.requiredFeatures && format(',{0}', matrix.package.requiredFeatures) || '' }},$feature" ${{ matrix.package.cargo }}"
+                          echo "RUNNING \`$command\`"
+                          if ${{ matrix.package.env }} cargo${{ matrix.package.nightly && ' +nightly' || '' }} clippy \
+                              --all-targets \
+                              --no-default-features \
+                              --features="fail-on-warnings${{ matrix.package.requiredFeatures && format(',{0}', matrix.package.requiredFeatures) || '' }},$feature" ${{ matrix.package.cargo }}; then
+                              echo "SUCCESS \`$command\`";
+                          else
+                              >&2 echo "FAILED \`$command\`";
+                              return 1
+                          fi
+                      done <<<"$(echo '${{ toJson(matrix.package.features) }}' | jq -r '.[]')")
+
+            - name: Run ${{ matrix.package.name }} tests
+              working-directory: planning-poker
+              shell: bash
+              run: |
+                  (cd ${{ matrix.package.path }}; \
+                      while read -r feature; do \
+                          command="${{ matrix.package.env }} cargo${{ matrix.package.nightly && ' +nightly' || '' }} test --no-default-features --features="fail-on-warnings${{ matrix.package.requiredFeatures && format(',{0}', matrix.package.requiredFeatures) || '' }},$feature" ${{ matrix.package.cargo }}"
+                          echo "RUNNING \`$command\`"
+                          if ${{ matrix.package.env }} cargo${{ matrix.package.nightly && ' +nightly' || '' }} test \
+                              --no-default-features \
+                              --features="fail-on-warnings${{ matrix.package.requiredFeatures && format(',{0}', matrix.package.requiredFeatures) || '' }},$feature" ${{ matrix.package.cargo }}; then
+                              echo "SUCCESS \`$command\`";
+                          else
+                              >&2 echo "FAILED \`$command\`";
+                              return 1
+                          fi
+                      done <<<"$(echo '${{ toJson(matrix.package.features) }}' | jq -r '.[]')")
+
+            - name: Format ${{ matrix.package.name }}
+              working-directory: planning-poker
+              shell: bash
+              run: |
+                  (cd ${{ matrix.package.path }}; ${{ matrix.package.env }} cargo${{ matrix.package.nightly && ' +nightly' || '' }} fmt)
+
+    commit-incompatible:
+        name: Commit incompatible upgrades
+        runs-on: ubuntu-latest
+        needs:
+            [
+                upgrade-compatible,
+                upgrade-incompatible,
+                validate-incompatible,
+                test-incompatible,
+            ]
+        if: ${{ always() && needs.upgrade-incompatible.outputs.upgraded == 'true' }}
+        steps:
+            - name: Checkout planning-poker
+              uses: actions/checkout@v4
+              with:
+                  path: planning-poker
+                  token: ${{ secrets.GITHUB_TOKEN }}
+                  fetch-depth: 0
+
+            - name: Checkout incompatible upgrade branch
+              working-directory: planning-poker
+              run: |
+                  git fetch origin ${{ needs.upgrade-compatible.outputs.incompatible-branch }}
+                  git checkout ${{ needs.upgrade-compatible.outputs.incompatible-branch }}
+
+            - name: Merge to master if tests passed
+              if: ${{ needs.test-incompatible.result == 'success' || needs.validate-incompatible.outputs.matrix == '[]' }}
+              working-directory: planning-poker
+              run: |
+                  git config user.name "PlanningPokerBot"
+                  git config user.email "PlanningPokerBot@gmail.com"
+                  git fetch origin master
+                  git rebase origin/master
+                  git checkout master
+                  git merge --ff-only ${{ needs.upgrade-compatible.outputs.incompatible-branch }}
+                  git push origin master
+                  echo "✅ Incompatible upgrades merged to master"
+
+            - name: Leave branch if tests failed
+              if: ${{ needs.test-incompatible.result == 'failure' }}
+              run: |
+                  echo "❌ Tests failed - leaving branch ${{ needs.upgrade-compatible.outputs.incompatible-branch }} for manual review"
