@@ -55,13 +55,17 @@ jobs:
               with:
                   components: rustfmt, clippy
 
-            - name: Install cargo-edit
-              shell: bash
-              run: |
-                  cargo install \
-                      -f cargo-edit \
-                      --git https://github.com/BSteffaniak/cargo-edit \
-                      --branch add-skip-git-dependencies
+            - name: Setup cargo-edit
+              uses: BSteffaniak/cache-artifact@master
+              with:
+                  repo: https://github.com/BSteffaniak/cargo-edit
+                  command: cargo install -f cargo-edit --git https://github.com/BSteffaniak/cargo-edit --branch add-skip-git-dependencies
+                  shell: bash
+                  output-path: ~/.cargo/bin/cargo-edit
+                  artifact-name: cargo-edit-ubuntu-binary
+                  cache-key-prefix: cargo-edit
+                  make-executable: true
+                  verify-command: --version
 
             - name: Create upgrade branch
               working-directory: planning-poker
@@ -275,6 +279,24 @@ jobs:
               run: |
                   (cd ${{ matrix.package.path }}; ${{ matrix.package.env }} cargo${{ matrix.package.nightly && ' +nightly' || '' }} ${{ runner.debug && '-vv' }} fmt --all -- --check)
 
+            - name: Setup cargo-machete
+              uses: BSteffaniak/cache-artifact@master
+              with:
+                  repo: https://github.com/BSteffaniak/cargo-machete
+                  command: cargo install --git https://github.com/BSteffaniak/cargo-machete --branch ignored-dirs cargo-machete
+                  shell: bash
+                  output-path: ~/.cargo/bin/cargo-machete
+                  artifact-name: cargo-machete-ubuntu-binary
+                  cache-key-prefix: cargo-machete
+                  make-executable: true
+                  verify-command: --version
+
+            - name: Validate ${{ matrix.package.name }} dependencies (machete)
+              working-directory: planning-poker
+              shell: bash
+              run: |
+                  ${{ matrix.package.env }} ~/.cargo/bin/cargo-machete --with-metadata ${{ matrix.package.path }}
+
     commit-compatible:
         name: Commit compatible upgrades
         runs-on: ubuntu-latest
@@ -344,13 +366,17 @@ jobs:
               with:
                   components: rustfmt, clippy
 
-            - name: Install cargo-edit
-              shell: bash
-              run: |
-                  cargo install \
-                      -f cargo-edit \
-                      --git https://github.com/BSteffaniak/cargo-edit \
-                      --branch add-skip-git-dependencies
+            - name: Setup cargo-edit
+              uses: BSteffaniak/cache-artifact@master
+              with:
+                  repo: https://github.com/BSteffaniak/cargo-edit
+                  command: cargo install -f cargo-edit --git https://github.com/BSteffaniak/cargo-edit --branch add-skip-git-dependencies
+                  shell: bash
+                  output-path: ~/.cargo/bin/cargo-edit
+                  artifact-name: cargo-edit-ubuntu-binary
+                  cache-key-prefix: cargo-edit
+                  make-executable: true
+                  verify-command: --version
 
             - name: Create incompatible upgrade branch
               working-directory: planning-poker
@@ -557,6 +583,24 @@ jobs:
               shell: bash
               run: |
                   (cd ${{ matrix.package.path }}; ${{ matrix.package.env }} cargo${{ matrix.package.nightly && ' +nightly' || '' }} fmt)
+
+            - name: Setup cargo-machete
+              uses: BSteffaniak/cache-artifact@master
+              with:
+                  repo: https://github.com/BSteffaniak/cargo-machete
+                  command: cargo install --git https://github.com/BSteffaniak/cargo-machete --branch ignored-dirs cargo-machete
+                  shell: bash
+                  output-path: ~/.cargo/bin/cargo-machete
+                  artifact-name: cargo-machete-ubuntu-binary
+                  cache-key-prefix: cargo-machete
+                  make-executable: true
+                  verify-command: --version
+
+            - name: Validate ${{ matrix.package.name }} dependencies (machete)
+              working-directory: planning-poker
+              shell: bash
+              run: |
+                  ${{ matrix.package.env }} ~/.cargo/bin/cargo-machete --with-metadata ${{ matrix.package.path }}
 
     commit-incompatible:
         name: Commit incompatible upgrades
