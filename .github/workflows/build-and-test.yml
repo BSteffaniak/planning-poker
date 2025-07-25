@@ -2,22 +2,16 @@ name: Build and Test
 
 on:
     push:
-        branches: ["master", "edge"]
+        branches: ["master"]
         paths:
             - .github/workflows/build-and-test.yml
             - packages/**
             - "**/*.toml"
             - "**/Cargo.lock"
     pull_request:
-        branches: ["master", "edge"]
-    schedule:
-        - cron: "0 7 * * *"
+        branches: ["master"]
     workflow_dispatch:
         inputs:
-            edge:
-                description: "Edge"
-                required: false
-                default: "false"
             seed:
                 description: "Random seed for deterministic feature randomization (leave empty for random)"
                 required: false
@@ -286,7 +280,7 @@ jobs:
                           HEAD_SHA="$AFTER_SHA"
                       fi
                   else
-                      echo "Workflow dispatch or schedule: comparing against HEAD~1"
+                      echo "Workflow dispatch: comparing against HEAD~1"
                       BASE_SHA="HEAD~1"
                       HEAD_SHA="HEAD"
                   fi
@@ -316,18 +310,13 @@ jobs:
                       CLIPPIER_CMD="~/.cargo/bin/clippier features . --chunked 15 --max-parallel 256 -o json --spread --randomize --seed $RANDOMIZATION_SEED --skip-features fail-on-warnings"
                       ANALYSIS_TYPE="full"
                       SHOULD_BUILD=true
-                  elif [[ "${{ github.event_name }}" == "schedule" ]]; then
-                      echo "⏰ Scheduled run - building all packages"
-                      CLIPPIER_CMD="~/.cargo/bin/clippier features . --chunked 15 --max-parallel 256 -o json --spread --randomize --seed $RANDOMIZATION_SEED --skip-features fail-on-warnings"
-                      ANALYSIS_TYPE="full"
-                      SHOULD_BUILD=true
                   elif [[ -n "$CHANGED_FILES" ]]; then
                       echo "🔍 Using smart dependency analysis for Cargo.lock/Cargo.toml changes"
                       CLIPPIER_CMD="~/.cargo/bin/clippier features . --changed-files \"$CHANGED_FILES\" --git-base \"$BASE_SHA\" --git-head \"$HEAD_SHA\" --chunked 15 --max-parallel 256 -o json --spread --randomize --seed $RANDOMIZATION_SEED --skip-features fail-on-warnings"
                       ANALYSIS_TYPE="smart"
                       SHOULD_BUILD=true
                   else
-                      echo "❌ No changes detected and not a scheduled/manual run - skipping builds"
+                      echo "❌ No changes detected and not a manual run - skipping builds"
                       ANALYSIS_TYPE="none"
                       SHOULD_BUILD=false
                   fi
@@ -344,13 +333,11 @@ jobs:
                       echo "📋 Full clippier output with reasoning:"
                       echo "$FULL_OUTPUT" | jq .
 
-                      # For manual/scheduled runs, enhance the reasoning with manual context
+                      # For manual runs, enhance the reasoning with manual context
                       if [[ "$ANALYSIS_TYPE" == "full" ]]; then
                           MANUAL_REASON=""
                           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
                               MANUAL_REASON="Manual workflow dispatch - all packages included"
-                          elif [[ "${{ github.event_name }}" == "schedule" ]]; then
-                              MANUAL_REASON="Scheduled workflow run - all packages included"
                           fi
 
                           # Add manual reasoning to each package in the output
@@ -402,7 +389,7 @@ jobs:
                           echo "📊 Building $JOBS_COUNT $JOB_PLURAL for $PACKAGES_LENGTH affected $PACKAGE_PLURAL (instead of full workspace)"
                       fi
 
-                      # Check if matrix is empty (shouldn't happen for workflow_dispatch/schedule, but could for smart/file analysis)
+                      # Check if matrix is empty (shouldn't happen for workflow_dispatch, but could for smart/file analysis)
                       if [[ "$(echo "$MATRIX" | jq length)" -eq 0 ]]; then
                           echo "has-changes=false" >> $GITHUB_OUTPUT
                           echo "matrix=[]" >> $GITHUB_OUTPUT
@@ -414,7 +401,7 @@ jobs:
                           echo "✅ Found affected packages"
                       fi
                   else
-                      # No changes detected and not a manual/scheduled run
+                      # No changes detected and not a manual run
                       echo "has-changes=false" >> $GITHUB_OUTPUT
                       echo "matrix=[]" >> $GITHUB_OUTPUT
                       echo "reasoning=" >> $GITHUB_OUTPUT
@@ -425,12 +412,12 @@ jobs:
                   echo ""
                   echo "🎯 Checking Tauri-related changes..."
 
-                  if [[ "${{ github.event_name }}" == "workflow_dispatch" || "${{ github.event_name }}" == "schedule" ]]; then
-                      # For manual or scheduled runs, assume Tauri is affected
-                      echo "Manual or scheduled run - assuming Tauri is affected"
+                  if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+                      # For manual runs, assume Tauri is affected
+                      echo "Manual run - assuming Tauri is affected"
                       echo "has-tauri-changes=true" >> $GITHUB_OUTPUT
-                      echo 'tauri-reasoning={"affected": true, "reasoning": ["Manual or scheduled workflow run - all packages assumed affected"]}' >> $GITHUB_OUTPUT
-                      echo "✅ Tauri-related changes assumed for manual/scheduled run"
+                      echo 'tauri-reasoning={"affected": true, "reasoning": ["Manual workflow run - all packages assumed affected"]}' >> $GITHUB_OUTPUT
+                      echo "✅ Tauri-related changes assumed for manual run"
                   elif [[ "$SHOULD_BUILD" == "true" && -n "$CHANGED_FILES" ]]; then
                       # First check if app-website files changed (these don't affect Rust packages but do affect Tauri)
                       WEBSITE_AFFECTED=false
@@ -480,7 +467,7 @@ jobs:
                           echo "❌ No Tauri-related changes detected - Tauri release will be skipped"
                       fi
                   else
-                      # No changes detected and not a manual/scheduled run
+                      # No changes detected and not a manual run
                       echo "No changes detected - Tauri release will be skipped"
                       echo "has-tauri-changes=false" >> $GITHUB_OUTPUT
                       echo "tauri-reasoning=" >> $GITHUB_OUTPUT
@@ -506,9 +493,6 @@ jobs:
                   case "$EVENT_NAME" in
                       "workflow_dispatch")
                           echo "🚀 **Trigger**: Manual workflow dispatch" >> $GITHUB_STEP_SUMMARY
-                          ;;
-                      "schedule")
-                          echo "⏰ **Trigger**: Scheduled run" >> $GITHUB_STEP_SUMMARY
                           ;;
                       "push")
                           echo "📤 **Trigger**: Push to ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
@@ -598,8 +582,8 @@ jobs:
                           echo '${{ needs.determine-affected-packages.outputs.matrix }}' | jq -r 'group_by(.name) | map("- \(.[0].name) (\(length) job\(if length > 1 then "s" else "" end))") | .[]' >> $GITHUB_STEP_SUMMARY
                       fi
                   else
-                      if [[ "$EVENT_NAME" == "workflow_dispatch" || "$EVENT_NAME" == "schedule" ]]; then
-                          echo "⚠️ **No Packages**: Matrix generation may have failed for manual/scheduled run" >> $GITHUB_STEP_SUMMARY
+                      if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+                          echo "⚠️ **No Packages**: Matrix generation may have failed for manual run" >> $GITHUB_STEP_SUMMARY
                       else
                           echo "🎉 **No Changes**: No packages affected - builds will be skipped!" >> $GITHUB_STEP_SUMMARY
                       fi
@@ -720,15 +704,6 @@ jobs:
               with:
                   repository: MoosicBox/MoosicBox
                   path: MoosicBox
-
-            - name: Enable patches
-              if: ${{ github.event_name == 'schedule' || github.event.inputs.edge == 'true' }}
-              working-directory: planning-poker
-              run: |
-                  git config user.name "MoosicBoxBot"
-                  git config user.email "MoosicBoxBot@gmail.com"
-                  git checkout edge
-                  git rebase master
 
             - uses: dtolnay/rust-toolchain@stable
               with:
