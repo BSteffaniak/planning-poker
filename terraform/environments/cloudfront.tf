@@ -62,6 +62,28 @@ resource "aws_cloudfront_distribution" "main" {
     max_ttl     = 86400
   }
 
+  # SSE endpoint - separate behavior with no caching
+  ordered_cache_behavior {
+    path_pattern           = "/$sse"
+    allowed_methods        = ["GET", "HEAD", "OPTIONS"]
+    cached_methods         = ["GET", "HEAD"]
+    target_origin_id       = "Lambda-${local.lambda_function_name}"
+    compress               = false  # Don't compress SSE streams
+    viewer_protocol_policy = "redirect-to-https"
+
+    forwarded_values {
+      query_string = true
+      headers      = ["Authorization", "CloudFront-Forwarded-Proto", "Cache-Control"]
+      cookies {
+        forward = "all"
+      }
+    }
+
+    min_ttl     = 0
+    default_ttl = 0
+    max_ttl     = 0
+  }
+
   # Dynamic routes go to Lambda
   dynamic "ordered_cache_behavior" {
     for_each = ["/api/*", "/game/*", "/join-game", "/__hyperchad_dynamic_root__"]
