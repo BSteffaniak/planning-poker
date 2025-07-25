@@ -69,7 +69,7 @@ impl PlanningPokerState {
     /// Set up database connection and initialize schema
     async fn setup_database(&self) -> Result<DatabaseSessionManager, StateError> {
         // Set up database connection
-        let config = Config::default();
+        let config = Config::from_env();
         let database_url = config
             .database_url
             .unwrap_or_else(|| "sqlite://planning_poker.db".to_string());
