@@ -7,6 +7,57 @@ resource "aws_cloudfront_origin_access_control" "s3" {
   signing_protocol                  = "sigv4"
 }
 
+# Cache policy for streaming responses
+resource "aws_cloudfront_cache_policy" "streaming" {
+  name        = "planning-poker-streaming-${terraform.workspace}"
+  comment     = "Cache policy for streaming SSE responses"
+  default_ttl = 0
+  max_ttl     = 0
+  min_ttl     = 0
+
+  parameters_in_cache_key_and_forwarded_to_origin {
+    enable_accept_encoding_brotli = false
+    enable_accept_encoding_gzip   = false
+
+    query_strings_config {
+      query_string_behavior = "none"
+    }
+
+    headers_config {
+      header_behavior = "none"
+    }
+
+    cookies_config {
+      cookie_behavior = "none"
+    }
+  }
+}
+
+# Origin request policy for streaming
+resource "aws_cloudfront_origin_request_policy" "streaming" {
+  name    = "planning-poker-streaming-origin-${terraform.workspace}"
+  comment = "Origin request policy for streaming responses"
+
+  query_strings_config {
+    query_string_behavior = "all"
+  }
+
+  headers_config {
+    header_behavior = "whitelist"
+    headers {
+      items = [
+        "CloudFront-Forwarded-Proto",
+        "Cache-Control",
+        "Accept"
+      ]
+    }
+  }
+
+  cookies_config {
+    cookie_behavior = "all"
+  }
+}
+
 # CloudFront distribution
 resource "aws_cloudfront_distribution" "main" {
   depends_on = [
@@ -71,13 +122,9 @@ resource "aws_cloudfront_distribution" "main" {
     compress               = false  # Don't compress SSE streams
     viewer_protocol_policy = "redirect-to-https"
 
-    forwarded_values {
-      query_string = true
-      headers      = ["Authorization", "CloudFront-Forwarded-Proto", "Cache-Control"]
-      cookies {
-        forward = "all"
-      }
-    }
+    # Use managed policies for streaming
+    cache_policy_id          = aws_cloudfront_cache_policy.streaming.id
+    origin_request_policy_id = aws_cloudfront_origin_request_policy.streaming.id
 
     min_ttl     = 0
     default_ttl = 0

@@ -170,13 +170,14 @@ resource "aws_lambda_function_url" "app" {
 
   function_name      = local.lambda_function_name
   authorization_type = "NONE"
+  invoke_mode        = "RESPONSE_STREAM"
 
   cors {
     allow_credentials = false
     allow_origins     = ["https://${local.subdomain}"]
     allow_methods     = ["GET", "POST", "PUT", "DELETE", "HEAD", "PATCH"]
-    allow_headers     = ["date", "keep-alive", "content-type", "authorization"]
-    expose_headers    = ["date", "keep-alive"]
+    allow_headers     = ["date", "keep-alive", "content-type", "authorization", "cache-control", "accept"]
+    expose_headers    = ["date", "keep-alive", "cache-control", "content-type"]
     max_age          = 86400
   }
 }
