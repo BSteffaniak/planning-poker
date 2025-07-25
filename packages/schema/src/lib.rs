@@ -227,7 +227,7 @@ pub async fn migrate_until(
 
 #[cfg(test)]
 mod tests {
-    #[cfg(feature = "sqlite")]
+    #[cfg(any(feature = "sqlite", feature = "postgres"))]
     use super::*;
 
     #[test]
