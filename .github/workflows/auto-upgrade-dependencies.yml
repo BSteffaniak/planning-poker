@@ -55,17 +55,17 @@ jobs:
               with:
                   components: rustfmt, clippy
 
-            - name: Setup cargo-edit
+            - name: Setup cargo-upgrade
               uses: BSteffaniak/cache-artifact@master
               with:
                   repo: https://github.com/BSteffaniak/cargo-edit
                   command: cargo install -f cargo-edit --git https://github.com/BSteffaniak/cargo-edit --branch add-skip-git-dependencies
                   shell: bash
-                  output-path: ~/.cargo/bin/cargo-edit
-                  artifact-name: cargo-edit-ubuntu-binary
-                  cache-key-prefix: cargo-edit
+                  output-path: ~/.cargo/bin/cargo-upgrade
+                  artifact-name: cargo-upgrade-ubuntu-binary
+                  cache-key-prefix: cargo-upgrade
                   make-executable: true
-                  verify-command: --version
+                  verify-command: --help
 
             - name: Create upgrade branch
               working-directory: planning-poker
@@ -366,17 +366,17 @@ jobs:
               with:
                   components: rustfmt, clippy
 
-            - name: Setup cargo-edit
+            - name: Setup cargo-upgrade
               uses: BSteffaniak/cache-artifact@master
               with:
                   repo: https://github.com/BSteffaniak/cargo-edit
                   command: cargo install -f cargo-edit --git https://github.com/BSteffaniak/cargo-edit --branch add-skip-git-dependencies
                   shell: bash
-                  output-path: ~/.cargo/bin/cargo-edit
-                  artifact-name: cargo-edit-ubuntu-binary
-                  cache-key-prefix: cargo-edit
+                  output-path: ~/.cargo/bin/cargo-upgrade
+                  artifact-name: cargo-upgrade-ubuntu-binary
+                  cache-key-prefix: cargo-upgrade
                   make-executable: true
-                  verify-command: --version
+                  verify-command: --help
 
             - name: Create incompatible upgrade branch
               working-directory: planning-poker
