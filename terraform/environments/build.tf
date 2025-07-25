@@ -1,10 +1,10 @@
 # Build static assets
 resource "terraform_data" "build_static" {
   triggers_replace = {
-    environment     = terraform.workspace
-    cargo_toml      = filemd5("${path.module}/../../Cargo.toml")
-    app_cargo_toml  = filemd5("${path.module}/../../packages/app/Cargo.toml")
-    app_src_files   = md5(join("", [for f in fileset("${path.module}/../../packages/app/src", "**/*.rs") : filemd5("${path.module}/../../packages/app/src/${f}")]))
+    environment          = terraform.workspace
+    cargo_toml           = filemd5("${path.module}/../../Cargo.toml")
+    packages_cargo_tomls = md5(join("", [for f in fileset("${path.module}/../../packages", "**/*.toml") : filemd5("${path.module}/../../packages/${f}")]))
+    packages_src_files   = md5(join("", [for f in fileset("${path.module}/../../packages", "**/*.rs") : filemd5("${path.module}/../../packages/${f}")]))
   }
 
   provisioner "local-exec" {
@@ -20,11 +20,11 @@ resource "terraform_data" "build_static" {
 # Build Lambda function
 resource "terraform_data" "build_lambda" {
   triggers_replace = {
-    environment     = terraform.workspace
-    debug_mode      = var.debug_mode
-    cargo_toml      = filemd5("${path.module}/../../Cargo.toml")
-    app_cargo_toml  = filemd5("${path.module}/../../packages/app/Cargo.toml")
-    app_src_files   = md5(join("", [for f in fileset("${path.module}/../../packages/app/src", "**/*.rs") : filemd5("${path.module}/../../packages/app/src/${f}")]))
+    environment          = terraform.workspace
+    debug_mode           = var.debug_mode
+    cargo_toml           = filemd5("${path.module}/../../Cargo.toml")
+    packages_cargo_tomls = md5(join("", [for f in fileset("${path.module}/../../packages", "**/*.toml") : filemd5("${path.module}/../../packages/${f}")]))
+    packages_src_files   = md5(join("", [for f in fileset("${path.module}/../../packages", "**/*.rs") : filemd5("${path.module}/../../packages/${f}")]))
   }
 
   provisioner "local-exec" {
@@ -46,12 +46,12 @@ resource "terraform_data" "upload_assets" {
   ]
 
   triggers_replace = {
-    environment     = terraform.workspace
-    debug_mode      = var.debug_mode
-    cargo_toml      = filemd5("${path.module}/../../Cargo.toml")
-    app_cargo_toml  = filemd5("${path.module}/../../packages/app/Cargo.toml")
-    app_main_rs     = filemd5("${path.module}/../../packages/app/src/main.rs")
-    build_static_id = terraform_data.build_static.id
+    environment          = terraform.workspace
+    debug_mode           = var.debug_mode
+    cargo_toml           = filemd5("${path.module}/../../Cargo.toml")
+    packages_cargo_tomls = md5(join("", [for f in fileset("${path.module}/../../packages", "**/*.toml") : filemd5("${path.module}/../../packages/${f}")]))
+    packages_src_files   = md5(join("", [for f in fileset("${path.module}/../../packages", "**/*.rs") : filemd5("${path.module}/../../packages/${f}")]))
+    build_static_id      = terraform_data.build_static.id
   }
 
   provisioner "local-exec" {
