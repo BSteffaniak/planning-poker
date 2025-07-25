@@ -82,8 +82,12 @@ _sse = [
     "hyperchad/renderer-vanilla-js-plugin-sse",
 ]
 
-actix  = ["_sse", "hyperchad/renderer-html-actix"]
-lambda = ["_sse", "hyperchad/renderer-html-lambda"]
+actix = ["_sse", "hyperchad/renderer-html-actix"]
+lambda = [
+    "_sse",
+    "hyperchad/renderer-html-cdn",
+    "hyperchad/renderer-html-lambda",
+]
 
 assets        = ["hyperchad/renderer-assets"]
 insecure      = ["hyperchad/renderer-vanilla-js-plugin-uuid-insecure"]

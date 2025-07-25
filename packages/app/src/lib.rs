@@ -312,16 +312,16 @@ pub fn init() -> AppBuilder {
 /// # Errors
 ///
 /// * If app building fails
-pub fn build_app(builder: AppBuilder) -> Result<App<DefaultRenderer>, hyperchad::app::Error> {
-    // Create router with planning poker routes
-    let router = create_app_router();
-
+pub fn build_app(
+    builder: AppBuilder,
+    router: Router,
+) -> Result<App<DefaultRenderer>, hyperchad::app::Error> {
     let app = builder.with_router(router).build_default()?;
     Ok(app)
 }
 
 pub fn create_app_router() -> Router {
-    planning_poker_ui::create_router()
+    let router = planning_poker_ui::create_router()
         .with_route_result("/join-game", join_game_route)
         .with_route_result(
             hyperchad::router::RoutePath::LiteralPrefix("/game/".to_string()),
@@ -354,7 +354,12 @@ pub fn create_app_router() -> Router {
                     get_game_route(req).await
                 }
             },
-        )
+        );
+
+    #[cfg(feature = "lambda")]
+    let router = hyperchad::renderer_html_cdn::setup_cdn_optimization(router, None, None);
+
+    router
 }
 
 /// Handles the join game route

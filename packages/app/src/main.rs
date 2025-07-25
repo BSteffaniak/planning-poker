@@ -2,7 +2,7 @@
 #![warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
 #![allow(clippy::multiple_crate_versions)]
 
-use planning_poker_app::{build_app, init, set_renderer};
+use planning_poker_app::{build_app, create_app_router, init, set_renderer};
 use std::sync::Arc;
 use tracing::info;
 
@@ -26,8 +26,11 @@ fn main() -> Result<(), hyperchad::app::Error> {
     // Initialize app builder (synchronous like MoosicBox)
     let app_builder = init().with_runtime_handle(runtime.handle().clone());
 
+    // Create router with planning poker routes
+    let router = create_app_router();
+
     // Build app (database will be initialized lazily when needed)
-    let app = build_app(app_builder)?;
+    let app = build_app(app_builder, router)?;
 
     let renderer = Arc::new(app.renderer.clone());
     info!("Setting renderer");
