@@ -36,35 +36,14 @@ resource "aws_cloudfront_distribution" "main" {
     }
   }
 
-  enabled         = true
-  is_ipv6_enabled = true
+  enabled             = true
+  is_ipv6_enabled     = true
+  default_root_object = "index.html"
 
   tags = local.common_tags
 
-  # Default behavior - serve dynamic content from Lambda
+  # Default behavior - serve static assets from S3 (including index.html)
   default_cache_behavior {
-    allowed_methods        = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
-    cached_methods         = ["GET", "HEAD"]
-    target_origin_id       = "Lambda-${local.lambda_function_name}"
-    compress               = true
-    viewer_protocol_policy = "redirect-to-https"
-
-    forwarded_values {
-      query_string = true
-      headers      = ["Authorization", "CloudFront-Forwarded-Proto"]
-      cookies {
-        forward = "all"
-      }
-    }
-
-    min_ttl     = 0
-    default_ttl = 0
-    max_ttl     = 0
-  }
-
-  # Static assets behavior - serve from S3
-  ordered_cache_behavior {
-    path_pattern           = "/css/*"
     allowed_methods        = ["GET", "HEAD"]
     cached_methods         = ["GET", "HEAD"]
     target_origin_id       = "S3-${aws_s3_bucket.assets.id}"
@@ -83,29 +62,9 @@ resource "aws_cloudfront_distribution" "main" {
     max_ttl     = 86400
   }
 
-  ordered_cache_behavior {
-    path_pattern           = "/img/*"
-    allowed_methods        = ["GET", "HEAD"]
-    cached_methods         = ["GET", "HEAD"]
-    target_origin_id       = "S3-${aws_s3_bucket.assets.id}"
-    compress               = true
-    viewer_protocol_policy = "redirect-to-https"
-
-    forwarded_values {
-      query_string = false
-      cookies {
-        forward = "none"
-      }
-    }
-
-    min_ttl     = 0
-    default_ttl = 3600
-    max_ttl     = 86400
-  }
-
-  # Dynamic routes behavior - serve from Lambda
+  # Dynamic routes go to Lambda
   dynamic "ordered_cache_behavior" {
-    for_each = local.dynamic_routes
+    for_each = ["/api/*", "/game/*", "/join-game", "/__hyperchad_dynamic_root__"]
 
     content {
       path_pattern           = ordered_cache_behavior.value
@@ -145,11 +104,4 @@ resource "aws_cloudfront_distribution" "main" {
 
 # DNS record is now managed in cloudflare.tf
 
-# Local value for dynamic routes (will be populated by build process)
-locals {
-  dynamic_routes = [
-    "/api/*",
-    "/game/*",
-    "/session/*"
-  ]
-}
+

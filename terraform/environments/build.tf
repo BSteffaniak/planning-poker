@@ -51,6 +51,7 @@ resource "terraform_data" "upload_assets" {
     cargo_toml      = filemd5("${path.module}/../../Cargo.toml")
     app_cargo_toml  = filemd5("${path.module}/../../packages/app/Cargo.toml")
     app_main_rs     = filemd5("${path.module}/../../packages/app/src/main.rs")
+    build_static_id = terraform_data.build_static.id
   }
 
   provisioner "local-exec" {
