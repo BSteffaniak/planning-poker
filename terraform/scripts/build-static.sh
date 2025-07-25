@@ -12,7 +12,7 @@ rm -rf packages/app/gen/
 
 # Build static assets using HyperChad
 echo "Running cargo build for static assets..."
-nix-shell --run "cargo run -p planning_poker_app --release --bin planning-poker-app --no-default-features --features vanilla-js,static-routes,assets gen"
+cargo run -p planning_poker_app --release --bin planning-poker-app --no-default-features --features vanilla-js,static-routes,assets,lambda gen
 
 # Verify build output
 if [ ! -d "packages/app/gen" ]; then
