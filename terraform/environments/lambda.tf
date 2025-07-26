@@ -91,7 +91,7 @@ resource "aws_lambda_function" "app_release" {
 
   filename         = "${path.module}/../../target/lambda/planning-poker-app-lambda/bootstrap.zip"
 
-  function_name    = "planning-poker-${terraform.workspace}"
+  function_name    = "planning-poker-${terraform.workspace}-${formatdate("YYYYMMDD-hhmm", timestamp())}"
   role            = aws_iam_role.lambda.arn
   handler         = "bootstrap"
   runtime         = "provided.al2023"
@@ -112,6 +112,7 @@ resource "aws_lambda_function" "app_release" {
   }
 
   lifecycle {
+    create_before_destroy = true
     replace_triggered_by = [terraform_data.build_lambda]
   }
 
@@ -126,7 +127,7 @@ resource "aws_lambda_function" "app_debug" {
   s3_key           = aws_s3_object.lambda_package[0].key
   s3_object_version = aws_s3_object.lambda_package[0].version_id
 
-  function_name    = "planning-poker-${terraform.workspace}"
+  function_name    = "planning-poker-${terraform.workspace}-${formatdate("YYYYMMDD-hhmm", timestamp())}"
   role            = aws_iam_role.lambda.arn
   handler         = "bootstrap"
   runtime         = "provided.al2023"
@@ -148,6 +149,7 @@ resource "aws_lambda_function" "app_debug" {
   }
 
   lifecycle {
+    create_before_destroy = true
     replace_triggered_by = [
       terraform_data.build_lambda,
       aws_s3_object.lambda_package[0]
@@ -162,13 +164,7 @@ resource "aws_lambda_function" "app_debug" {
 
 # Lambda function URL (for API Gateway integration)
 resource "aws_lambda_function_url" "app" {
-  depends_on = [
-    terraform_data.build_lambda,
-    aws_lambda_function.app_debug,
-    aws_lambda_function.app_release
-  ]
-
-  function_name      = local.lambda_function_name
+  function_name      = var.debug_mode ? aws_lambda_function.app_debug[0].function_name : aws_lambda_function.app_release[0].function_name
   authorization_type = "NONE"
   invoke_mode        = "RESPONSE_STREAM"
 
@@ -179,5 +175,9 @@ resource "aws_lambda_function_url" "app" {
     allow_headers     = ["date", "keep-alive", "content-type", "authorization", "cache-control", "accept"]
     expose_headers    = ["date", "keep-alive", "cache-control", "content-type"]
     max_age          = 86400
+  }
+
+  lifecycle {
+    create_before_destroy = true
   }
 }
