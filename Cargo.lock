@@ -3256,9 +3256,7 @@ dependencies = [
  "bytes",
  "flate2",
  "flume",
- "futures",
  "futures-util",
- "hyper 1.6.0",
  "hyperchad_renderer",
  "lambda_http",
  "lambda_runtime",
@@ -3267,7 +3265,6 @@ dependencies = [
  "moosicbox_env_utils",
  "serde_json",
  "switchy",
- "tokio-stream",
 ]
 
 [[package]]
