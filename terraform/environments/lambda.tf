@@ -104,7 +104,7 @@ resource "aws_lambda_function" "app_release" {
     variables = merge(
       {
         ENVIRONMENT = terraform.workspace
-        RUST_LOG    = var.enable_debug_logging ? "planning_poker=debug,hyperchad=debug" : "planning_poker=info"
+        RUST_LOG    = var.enable_trace_logging ? "planning_poker=trace,hyperchad=trace,moosicbox=trace,switchy=trace" : var.enable_debug_logging ? "planning_poker=debug,hyperchad=debug,moosicbox=debug,switchy=debug" : "planning_poker=info,moosicbox=info,switchy=info"
       },
       var.database_url != null ? { DATABASE_URL = var.database_url } : {},
       var.lambda_environment_variables

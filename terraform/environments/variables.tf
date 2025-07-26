@@ -11,6 +11,12 @@ variable "enable_debug_logging" {
   default     = false
 }
 
+variable "enable_trace_logging" {
+  description = "Enable trace logging for the Lambda function"
+  type        = bool
+  default     = false
+}
+
 variable "debug_mode" {
   description = "Enable debug mode (debug build, full logging, backtraces)"
   type        = bool
