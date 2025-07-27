@@ -85,8 +85,8 @@ chrono = { version = "0.4.41", default-features = false, features = [
 ] }
 clap = { version = "4.5.41", features = ["derive"] }
 include_dir = "0.7.4"
-log = { version = "0.4", features = ["release_max_level_trace"] }
-serde = { version = "1", features = ["derive"] }
+log = { version = "0.4.27", features = ["release_max_level_trace"] }
+serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.141"
 thiserror = "2.0.12"
 tokio = { version = "1.47.0" }
