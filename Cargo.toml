@@ -76,28 +76,21 @@ switchy = { version = "0.1.4", default-features = false, path = "../MoosicBox/pa
 # Simvar for deterministic simulation testing
 simvar = { version = "0.1.0", default-features = false, path = "../MoosicBox/packages/simvar" }
 
-# Common dependencies
-actix-web = "4.11.0"
-
 anyhow = "1.0.98"
 async-trait = "0.1.88"
-bytes = "1.10"
+bytes = "1.10.0"
 chrono = { version = "0.4.41", default-features = false, features = [
     "clock",
     "serde",
 ] }
 clap = { version = "4.5.41", features = ["derive"] }
-eframe = { version = "0.32.0", default-features = false }
-egui = { version = "0.32.0", default-features = false }
-futures = "0.3"
 include_dir = "0.7.4"
 log = { version = "0.4", features = ["release_max_level_trace"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1.0.141"
 thiserror = "2.0.12"
 tokio = { version = "1.47.0" }
-
-tracing            = "0.1.41"
+tracing = "0.1.41"
 tracing-subscriber = "0.3.19"
-url                = "2.5.4"
-uuid               = { version = "1.17.0", features = ["serde", "v4"] }
+url = "2.5.4"
+uuid = { version = "1.17.0", features = ["serde", "v4"] }
