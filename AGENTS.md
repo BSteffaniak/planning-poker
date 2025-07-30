@@ -24,7 +24,7 @@ cargo clippy --workspace --all-targets --all-features -- -D warnings  # Lint
 
 ## Server/App Runtime Restrictions
 
-- **DO NOT run server commands**: Never execute `cargo run --bin planning-poker-server` or `cargo run --bin planning-poker-app`
+- **DO NOT run server commands**: Never execute `cargo run --bin planning-poker-server` or `cargo run --bin planning_poker_app`
 - **Interactive processes hang**: These commands start interactive/infinite runtime processes that will hang the agent
 - **Build/test only**: Only use build, test, format, and lint commands - never attempt to serve the application
 - **Verification approach**: Use `cargo build` to verify the server/app compiles correctly

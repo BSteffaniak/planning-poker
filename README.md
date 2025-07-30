@@ -106,20 +106,20 @@ Options:
 
 ```bash
 # On NixOS systems:
-nix-shell --run "cargo run --bin planning-poker-app"
+nix-shell --run "cargo run --bin planning_poker_app"
 
 # Or directly (desktop is the default feature):
-cargo run --bin planning-poker-app
+cargo run --bin planning_poker_app
 ```
 
 #### Start the Web Client
 
 ```bash
 # On NixOS systems:
-nix-shell --run "cargo run --bin planning-poker-app --features web"
+nix-shell --run "cargo run --bin planning_poker_app --features web"
 
 # Or directly:
-cargo run --bin planning-poker-app --features web
+cargo run --bin planning_poker_app --features web
 ```
 
 ## Configuration

@@ -11,11 +11,11 @@ repository  = { workspace = true }
 version     = "0.1.0"
 
 [[bin]]
-name = "planning-poker-app"
+name = "planning_poker_app"
 path = "src/main.rs"
 
 [[bin]]
-name              = "planning-poker-app-lambda"
+name              = "planning_poker_app_lambda"
 path              = "src/lambda.rs"
 required-features = ["lambda", "vanilla-js"]
 
@@ -27,6 +27,7 @@ hyperchad = { workspace = true, features = [
     "actions-logic",
     "app",
     "color",
+    "json",
     "renderer",
     "router",
     "router-form",
@@ -34,7 +35,6 @@ hyperchad = { workspace = true, features = [
     "state",
     "template",
     "transformer",
-    "json",
 ] }
 planning_poker_config = { workspace = true }
 planning_poker_models = { workspace = true }
