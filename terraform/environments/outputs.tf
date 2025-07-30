@@ -3,27 +3,33 @@ output "website_url" {
   value       = "https://${local.subdomain}"
 }
 
-output "cloudfront_distribution_id" {
-  description = "CloudFront distribution ID"
-  value       = aws_cloudfront_distribution.main.id
+output "kubernetes_cluster_id" {
+  description = "DigitalOcean Kubernetes cluster ID"
+  value       = digitalocean_kubernetes_cluster.planning_poker.id
 }
 
-output "cloudfront_domain_name" {
-  description = "CloudFront distribution domain name"
-  value       = aws_cloudfront_distribution.main.domain_name
+output "kubernetes_cluster_endpoint" {
+  description = "Kubernetes cluster endpoint"
+  value       = digitalocean_kubernetes_cluster.planning_poker.endpoint
+  sensitive   = true
 }
 
-output "s3_bucket_name" {
-  description = "S3 bucket name for static assets"
-  value       = aws_s3_bucket.assets.bucket
+output "container_registry_endpoint" {
+  description = "Container registry endpoint"
+  value       = digitalocean_container_registry.planning_poker.endpoint
 }
 
-output "lambda_function_name" {
-  description = "Lambda function name"
-  value       = var.debug_mode ? aws_lambda_function.app_debug[0].function_name : aws_lambda_function.app_release[0].function_name
+output "kubernetes_namespace" {
+  description = "Kubernetes namespace for the application"
+  value       = kubernetes_namespace.planning_poker.metadata[0].name
 }
 
-output "lambda_function_url" {
-  description = "Lambda function URL"
-  value       = aws_lambda_function_url.app.function_url
+output "application_service_name" {
+  description = "Kubernetes service name for the application"
+  value       = kubernetes_service.planning_poker.metadata[0].name
+}
+
+output "ingress_hostname" {
+  description = "Ingress hostname for external access"
+  value       = local.subdomain
 }

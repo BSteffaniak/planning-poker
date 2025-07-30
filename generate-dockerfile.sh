@@ -63,8 +63,7 @@ build_clippier() {
 # Generate dockerfile for planning poker app
 generate_dockerfile() {
     local package_name="planning_poker_app"
-    local port="8080"
-    local features="postgres,vanilla-js"
+    local features="postgres,vanilla-js,actix"
     local dockerfile_name="PlanningPoker.Dockerfile"
     local dockerfile_path="packages/app/${dockerfile_name}"
 
@@ -76,8 +75,8 @@ generate_dockerfile() {
         log_warning "Backed up existing Dockerfile to ${dockerfile_path}.backup.*"
     fi
 
-    # Build the command
-    local cmd="~/.cargo/bin/clippier generate-dockerfile . ${package_name} --output $dockerfile_path --port $port"
+    # Build the command with environment variables and serve argument
+    local cmd="~/.cargo/bin/clippier generate-dockerfile . ${package_name} --output $dockerfile_path --build-env PORT=8080 --env MAX_THREADS=64 --env ACTIX_WORKERS=32 --arg serve --no-default-features"
     if [[ -n "$features" ]]; then
         cmd="$cmd --features=$features"
     fi

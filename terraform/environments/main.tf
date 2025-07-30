@@ -2,9 +2,17 @@ terraform {
   required_version = ">= 1.0"
 
   required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
+    digitalocean = {
+      source  = "digitalocean/digitalocean"
+      version = "~> 2.0"
+    }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.0"
+    }
+    helm = {
+      source  = "hashicorp/helm"
+      version = "~> 2.0"
     }
     cloudflare = {
       source  = "cloudflare/cloudflare"
@@ -17,8 +25,8 @@ terraform {
   }
 }
 
-provider "aws" {
-  region = "us-east-1"
+provider "digitalocean" {
+  # Token will be read from DIGITALOCEAN_TOKEN environment variable
 }
 
 provider "cloudflare" {
@@ -47,10 +55,6 @@ locals {
   environment = terraform.workspace
   is_prod     = terraform.workspace == "prod"
   subdomain   = local.is_prod ? "planning-poker.hyperchad.dev" : "${terraform.workspace}.planning-poker.hyperchad.dev"
-  bucket_name = "planning-poker-${terraform.workspace}-${random_id.suffix.hex}"
-
-  # Lambda function name abstraction for debug/release modes
-  lambda_function_name = var.debug_mode ? aws_lambda_function.app_debug[0].function_name : aws_lambda_function.app_release[0].function_name
 
   common_tags = {
     Environment = terraform.workspace
