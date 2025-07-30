@@ -3,7 +3,7 @@ authors     = { workspace = true }
 categories  = ["config", "development-tools"]
 description = "Configuration management for planning poker"
 edition     = { workspace = true }
-keywords    = ["config", "toml", "settings"]
+keywords    = ["config", "settings", "toml"]
 license     = { workspace = true }
 name        = "planning_poker_config"
 readme      = "../../README.md"
@@ -11,10 +11,10 @@ repository  = { workspace = true }
 version     = "0.1.0"
 
 [dependencies]
-anyhow = { workspace = true }
-serde = { workspace = true }
+anyhow    = { workspace = true }
+serde     = { workspace = true }
 thiserror = { workspace = true }
-toml = "0.9.4"
+toml      = { workspace = true }
 
 [features]
 default = []
