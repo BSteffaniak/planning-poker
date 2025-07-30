@@ -47,8 +47,8 @@ log_error() {
 build_clippier() {
     log_info "Checking if clippier is available..."
 
-    # Check if clippier binary exists
-    if [[ ! -f "~/.cargo/bin/clippier" ]]; then
+    # Check if clippier binary exists (fix tilde expansion)
+    if [[ ! -f ~/.cargo/bin/clippier ]]; then
         log_info "Installing clippier tool..."
         if ! cargo install --git https://github.com/MoosicBox/MoosicBox clippier --features git-diff; then
             log_error "Failed to install clippier"
@@ -56,7 +56,7 @@ build_clippier() {
         fi
         log_success "Clippier installed successfully"
     else
-        log_info "Clippier already installed"
+        log_info "Clippier already installed at ~/.cargo/bin/clippier"
     fi
 }
 
