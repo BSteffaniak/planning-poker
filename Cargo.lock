@@ -3152,6 +3152,7 @@ dependencies = [
  "hyperchad_transformer",
  "log 0.4.27",
  "serde",
+ "serde_json",
  "switchy_async",
 ]
 
@@ -3199,6 +3200,7 @@ dependencies = [
  "moosicbox_env_utils",
  "moosicbox_logging",
  "qstring",
+ "serde_json",
  "switchy",
  "thiserror 2.0.12",
  "uaparser",

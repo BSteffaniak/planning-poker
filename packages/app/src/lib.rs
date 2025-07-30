@@ -322,6 +322,7 @@ pub fn build_app(
 
 pub fn create_app_router() -> Router {
     let router = planning_poker_ui::create_router()
+        .with_route("/health", health_route)
         .with_route_result("/join-game", join_game_route)
         .with_route_result(
             hyperchad::router::RoutePath::LiteralPrefix("/game/".to_string()),
@@ -360,6 +361,13 @@ pub fn create_app_router() -> Router {
     let router = hyperchad::renderer_html_cdn::setup_cdn_optimization(router, None, None);
 
     router
+}
+
+/// Handles the health check route
+pub async fn health_route(_req: RouteRequest) -> Content {
+    Content::Json(serde_json::json!({
+        "success": true
+    }))
 }
 
 /// Handles the join game route

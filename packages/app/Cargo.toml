@@ -34,6 +34,7 @@ hyperchad = { workspace = true, features = [
     "state",
     "template",
     "transformer",
+    "json",
 ] }
 planning_poker_config = { workspace = true }
 planning_poker_models = { workspace = true }
