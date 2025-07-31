@@ -94,7 +94,8 @@ echo
 log_info "Useful kubectl commands for monitoring:"
 echo "  kubectl get pods -n planning-poker-$ENVIRONMENT"
 echo "  kubectl get services -n planning-poker-$ENVIRONMENT"
-echo "  kubectl get ingress -n planning-poker-$ENVIRONMENT"
+echo "  kubectl get certificates -n planning-poker-$ENVIRONMENT"
 echo "  kubectl logs -f deployment/planning-poker -n planning-poker-$ENVIRONMENT"
+echo "  kubectl logs -f deployment/moosicbox-lb -n planning-poker-$ENVIRONMENT"
 echo
 echo "Website URL: $(terraform output -raw website_url)"

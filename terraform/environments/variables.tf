@@ -21,7 +21,7 @@ variable "digitalocean_node_count" {
 variable "digitalocean_auto_scale" {
   description = "Enable auto-scaling for node pool"
   type        = bool
-  default     = true
+  default     = false  # Disable auto-scaling for single node setup
 }
 
 variable "digitalocean_min_nodes" {
@@ -33,7 +33,7 @@ variable "digitalocean_min_nodes" {
 variable "digitalocean_max_nodes" {
   description = "Maximum number of nodes for auto-scaling"
   type        = number
-  default     = 3
+  default     = 1  # Restrict to single node maximum
 }
 
 variable "container_registry_tier" {
@@ -110,6 +110,24 @@ variable "cert_manager_issuer" {
   description = "Cert-manager cluster issuer name"
   type        = string
   default     = "letsencrypt-prod"
+}
+
+variable "letsencrypt_email" {
+  description = "Email address for Let's Encrypt certificate notifications"
+  type        = string
+  default     = "BradenSteffaniak@gmail.com"
+}
+
+variable "use_ssl" {
+  description = "Enable SSL/TLS with automatic certificate provisioning via DNS-01"
+  type        = bool
+  default     = true
+}
+
+variable "cloudflare_api_token" {
+  description = "Cloudflare API token for DNS-01 challenges"
+  type        = string
+  sensitive   = true
 }
 
 # Horizontal Pod Autoscaler

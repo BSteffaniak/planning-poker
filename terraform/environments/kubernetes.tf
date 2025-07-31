@@ -182,41 +182,168 @@ resource "kubernetes_service" "planning_poker" {
   }
 }
 
-# Ingress for external access
-resource "kubernetes_ingress_v1" "planning_poker" {
-  metadata {
-    name      = "planning-poker-ingress"
-    namespace = kubernetes_namespace.planning_poker.metadata[0].name
-    labels    = local.k8s_labels
-
-    annotations = {
-      "kubernetes.io/ingress.class"                = "nginx"
-      "cert-manager.io/cluster-issuer"             = var.cert_manager_issuer
-      "nginx.ingress.kubernetes.io/ssl-redirect"   = "true"
-      "nginx.ingress.kubernetes.io/force-ssl-redirect" = "true"
+# Wildcard Certificate for SSL/TLS using kubectl provider
+resource "kubectl_manifest" "planning_poker_certificate" {
+  yaml_body = yamlencode({
+    apiVersion = "cert-manager.io/v1"
+    kind       = "Certificate"
+    metadata = {
+      name      = "planning-poker-wildcard-tls"
+      namespace = kubernetes_namespace.planning_poker.metadata[0].name
     }
+    spec = {
+      secretName = "planning-poker-tls"
+      issuerRef = {
+        name = var.cert_manager_issuer
+        kind = "ClusterIssuer"
+      }
+      dnsNames = [
+        "*.planning-poker.hyperchad.dev",  # Wildcard covers all subdomains
+        "planning-poker.hyperchad.dev"     # Also cover root domain
+      ]
+      duration    = "2160h"  # 90 days
+      renewBefore = "360h"   # 15 days before expiry
+      privateKey = {
+        algorithm = "RSA"
+        size      = 2048
+      }
+    }
+  })
+
+  depends_on = [
+    kubernetes_namespace.planning_poker,
+    kubectl_manifest.letsencrypt_prod
+  ]
+}
+
+# MoosicBox Load Balancer Deployment
+resource "kubernetes_deployment" "moosicbox_lb" {
+  metadata {
+    name      = "moosicbox-lb"
+    namespace = kubernetes_namespace.planning_poker.metadata[0].name
+    labels    = merge(local.k8s_labels, { component = "load-balancer" })
   }
 
   spec {
-    tls {
-      hosts       = [local.subdomain]
-      secret_name = "planning-poker-tls"
+    replicas = 1
+
+    selector {
+      match_labels = {
+        app = "moosicbox-lb"
+      }
     }
 
-    rule {
-      host = local.subdomain
+    template {
+      metadata {
+        labels = merge(local.k8s_labels, {
+          app       = "moosicbox-lb"
+          component = "load-balancer"
+        })
+      }
 
-      http {
-        path {
-          path      = "/"
-          path_type = "Prefix"
+      spec {
+        image_pull_secrets {
+          name = kubernetes_secret.registry_credentials.metadata[0].name
+        }
 
-          backend {
-            service {
-              name = kubernetes_service.planning_poker.metadata[0].name
-              port {
-                number = 80
-              }
+        container {
+          name  = "moosicbox-lb"
+          image = "${digitalocean_container_registry.planning_poker.endpoint}/moosicbox-lb:${var.image_tag}"
+
+          port {
+            container_port = 80
+            host_port     = 80  # Bind directly to node port 80
+            protocol       = "TCP"
+            name          = "http"
+          }
+          port {
+            container_port = 443
+            host_port     = 443  # Bind directly to node port 443
+            protocol       = "TCP"
+            name          = "https"
+          }
+
+          env {
+            name  = "CLUSTERS"
+            value = "${local.subdomain}:${kubernetes_service.planning_poker.metadata[0].name}.${kubernetes_namespace.planning_poker.metadata[0].name}.svc.cluster.local:80;solver:${kubernetes_service.acme_solver.metadata[0].name}.${kubernetes_namespace.planning_poker.metadata[0].name}.svc.cluster.local:80"
+          }
+          env {
+            name  = "PORT"
+            value = "80"  # Use standard HTTP port
+          }
+          env {
+            name  = "SSL_PORT"
+            value = "443"  # Use standard HTTPS port
+          }
+          env {
+            name  = "SSL_CRT_PATH"
+            value = "/etc/ssl/certs/tls.crt"
+          }
+          env {
+            name  = "SSL_KEY_PATH"
+            value = "/etc/ssl/private/tls.key"
+          }
+
+          volume_mount {
+            name       = "tls-certs"
+            mount_path = "/etc/ssl/certs"
+            read_only  = true
+          }
+          volume_mount {
+            name       = "tls-private"
+            mount_path = "/etc/ssl/private"
+            read_only  = true
+          }
+
+          resources {
+            requests = {
+              cpu    = "100m"
+              memory = "128Mi"
+            }
+            limits = {
+              cpu    = "200m"
+              memory = "256Mi"
+            }
+          }
+
+          liveness_probe {
+            tcp_socket {
+              port = 80  # Update to use standard HTTP port
+            }
+            initial_delay_seconds = 30
+            period_seconds        = 10
+            timeout_seconds       = 5
+            failure_threshold     = 3
+          }
+
+          readiness_probe {
+            tcp_socket {
+              port = 80  # Update to use standard HTTP port
+            }
+            initial_delay_seconds = 5
+            period_seconds        = 5
+            timeout_seconds       = 3
+            failure_threshold     = 3
+          }
+        }
+
+        volume {
+          name = "tls-certs"
+          secret {
+            secret_name = "planning-poker-tls"
+            items {
+              key  = "tls.crt"
+              path = "tls.crt"
+            }
+          }
+        }
+        volume {
+          name = "tls-private"
+          secret {
+            secret_name = "planning-poker-tls"
+            items {
+              key  = "tls.key"
+              path = "tls.key"
             }
           }
         }
@@ -224,7 +351,124 @@ resource "kubernetes_ingress_v1" "planning_poker" {
     }
   }
 
-  depends_on = [kubernetes_service.planning_poker]
+  depends_on = [
+    kubernetes_secret.registry_credentials,
+    kubectl_manifest.planning_poker_certificate
+  ]
+}
+
+# MoosicBox Load Balancer Service (NodePort to avoid LoadBalancer costs)
+resource "kubernetes_service" "moosicbox_lb" {
+  metadata {
+    name      = "moosicbox-lb-service"
+    namespace = kubernetes_namespace.planning_poker.metadata[0].name
+    labels    = merge(local.k8s_labels, { component = "load-balancer" })
+
+    annotations = {
+      "service.beta.kubernetes.io/do-loadbalancer-enable-proxy-protocol" = "true"
+      "service.beta.kubernetes.io/do-loadbalancer-hostname" = local.subdomain
+    }
+  }
+
+  spec {
+    type = "NodePort"  # Use NodePort instead of LoadBalancer to avoid costs
+    ip_families = ["IPv4"]
+    ip_family_policy = "SingleStack"
+
+    selector = {
+      app = "moosicbox-lb"
+    }
+
+    port {
+      name        = "http"
+      port        = 80
+      target_port = "http"
+      protocol    = "TCP"
+    }
+    port {
+      name        = "https"
+      port        = 443
+      target_port = "https"
+      protocol    = "TCP"
+    }
+  }
+
+  depends_on = [kubernetes_deployment.moosicbox_lb]
+}
+
+# Simple HTTP service for ACME challenges
+resource "kubernetes_deployment" "acme_solver" {
+  metadata {
+    name      = "acme-solver"
+    namespace = kubernetes_namespace.planning_poker.metadata[0].name
+    labels    = merge(local.k8s_labels, { component = "acme-solver" })
+  }
+
+  spec {
+    replicas = 1
+
+    selector {
+      match_labels = {
+        app = "acme-solver"
+      }
+    }
+
+    template {
+      metadata {
+        labels = merge(local.k8s_labels, {
+          app       = "acme-solver"
+          component = "acme-solver"
+        })
+      }
+
+      spec {
+        container {
+          name  = "acme-solver"
+          image = "nginx:alpine"
+
+          port {
+            container_port = 80
+            protocol       = "TCP"
+          }
+
+          resources {
+            requests = {
+              cpu    = "10m"
+              memory = "16Mi"
+            }
+            limits = {
+              cpu    = "50m"
+              memory = "32Mi"
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+resource "kubernetes_service" "acme_solver" {
+  metadata {
+    name      = "acme-solver-service"
+    namespace = kubernetes_namespace.planning_poker.metadata[0].name
+    labels    = merge(local.k8s_labels, { component = "acme-solver" })
+  }
+
+  spec {
+    type = "ClusterIP"
+    selector = {
+      app = "acme-solver"
+    }
+
+    port {
+      name        = "http"
+      port        = 80
+      target_port = 80
+      protocol    = "TCP"
+    }
+  }
+
+  depends_on = [kubernetes_deployment.acme_solver]
 }
 
 # Horizontal Pod Autoscaler (optional)

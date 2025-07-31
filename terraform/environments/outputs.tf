@@ -30,6 +30,26 @@ output "application_service_name" {
 }
 
 output "ingress_hostname" {
-  description = "Ingress hostname for external access"
+  description = "Hostname for external access via MoosicBox Load Balancer"
   value       = local.subdomain
+}
+
+output "certificate_name" {
+  description = "Name of the SSL certificate secret"
+  value       = "planning-poker-tls"
+}
+
+output "cert_manager_issuer" {
+  description = "ClusterIssuer used for SSL certificates"
+  value       = var.cert_manager_issuer
+}
+
+output "node_external_ip" {
+  description = "External IP of the Kubernetes node (where DNS points)"
+  value       = local.first_node_external_ip
+}
+
+output "service_type" {
+  description = "Service type used (NodePort to avoid LoadBalancer costs)"
+  value       = "NodePort"
 }
