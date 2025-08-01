@@ -11,12 +11,15 @@ repository  = { workspace = true }
 version     = "0.1.0"
 
 [dependencies]
-chrono = { workspace = true }
-serde  = { workspace = true }
-uuid   = { workspace = true }
+chrono               = { workspace = true }
+moosicbox_json_utils = { workspace = true, features = ["database"] }
+serde                = { workspace = true }
+switchy              = { workspace = true, features = ["database"] }
+uuid                 = { workspace = true }
 
 [features]
 default = []
 
+database = []
 fail-on-warnings = []
 

@@ -76,6 +76,9 @@ switchy = { version = "0.1.4", default-features = false, git = "https://github.c
 # Simvar for deterministic simulation testing
 simvar = { version = "0.1.0", default-features = false, git = "https://github.com/MoosicBox/MoosicBox" }
 
+# MoosicBox JSON utilities for database mapping
+moosicbox_json_utils = { version = "0.1.4", default-features = false, git = "https://github.com/MoosicBox/MoosicBox" }
+
 anyhow = "1.0.98"
 async-trait = "0.1.88"
 bytes = "1.10.1"
@@ -97,6 +100,7 @@ url = "2.5.4"
 uuid = { version = "1.17.0", features = ["serde", "v4"] }
 
 # [patch.'https://github.com/MoosicBox/MoosicBox']
-# hyperchad = { path = "../MoosicBox/packages/hyperchad" }
-# simvar    = { path = "../MoosicBox/packages/simvar" }
-# switchy   = { path = "../MoosicBox/packages/switchy" }
+# hyperchad            = { path = "../MoosicBox/packages/hyperchad" }
+# moosicbox_json_utils = { path = "../MoosicBox/packages/json_utils" }
+# simvar               = { path = "../MoosicBox/packages/simvar" }
+# switchy              = { path = "../MoosicBox/packages/switchy" }

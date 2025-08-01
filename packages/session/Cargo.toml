@@ -14,8 +14,9 @@ version     = "0.1.0"
 anyhow                  = { workspace = true }
 async-trait             = { workspace = true }
 chrono                  = { workspace = true }
+moosicbox_json_utils    = { workspace = true, features = ["database"] }
 planning_poker_database = { workspace = true }
-planning_poker_models   = { workspace = true }
+planning_poker_models   = { workspace = true, features = ["database"] }
 planning_poker_schema   = { workspace = true }
 switchy                 = { workspace = true, features = ["database"] }
 tracing                 = { workspace = true }

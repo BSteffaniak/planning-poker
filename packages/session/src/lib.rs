@@ -4,10 +4,12 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use chrono::{DateTime, NaiveDateTime, Utc};
-use planning_poker_database::{Database, DatabaseValue, Row};
+use chrono::Utc;
+use moosicbox_json_utils::ToValueType;
+use planning_poker_database::{Database, DatabaseValue};
 use planning_poker_models::{Game, GameState, Player, Session, Vote};
 use switchy::database::query::FilterableQuery;
+use tracing::warn;
 use uuid::Uuid;
 
 #[async_trait]
@@ -71,105 +73,6 @@ impl DatabaseSessionManager {
     }
 }
 
-// Database model conversion functions
-fn get_datetime_from_row(row: &Row, column: &str) -> Result<NaiveDateTime> {
-    match row.get(column) {
-        Some(DatabaseValue::DateTime(s)) => Ok(s),
-        Some(value) => Err(anyhow::anyhow!(
-            "Expected datetime for column '{}', got {:?}",
-            column,
-            value
-        )),
-        None => Err(anyhow::anyhow!("Missing column '{}'", column)),
-    }
-}
-
-// Database model conversion functions
-fn get_string_from_row(row: &Row, column: &str) -> Result<String> {
-    match row.get(column) {
-        Some(DatabaseValue::String(s)) => Ok(s),
-        Some(value) => Err(anyhow::anyhow!(
-            "Expected string for column '{}', got {:?}",
-            column,
-            value
-        )),
-        None => Err(anyhow::anyhow!("Missing column '{}'", column)),
-    }
-}
-
-fn get_optional_string_from_row(row: &Row, column: &str) -> Result<Option<String>> {
-    match row.get(column) {
-        Some(DatabaseValue::String(s)) => Ok(Some(s)),
-        Some(DatabaseValue::Null) | None => Ok(None),
-        Some(value) => Err(anyhow::anyhow!(
-            "Expected string or null for column '{}', got {:?}",
-            column,
-            value
-        )),
-    }
-}
-
-fn get_bool_from_row(row: &Row, column: &str) -> Result<bool> {
-    match row.get(column) {
-        Some(DatabaseValue::Bool(n)) => Ok(n),
-        Some(value) => Err(anyhow::anyhow!(
-            "Expected number for column '{}', got {:?}",
-            column,
-            value
-        )),
-        None => Err(anyhow::anyhow!("Missing column '{}'", column)),
-    }
-}
-
-fn row_to_game(row: &Row) -> Result<Game> {
-    let state_str = get_string_from_row(row, "state")?;
-    let state = match state_str.as_str() {
-        "Waiting" => GameState::Waiting,
-        "Voting" => GameState::Voting,
-        "Revealed" => GameState::Revealed,
-        _ => return Err(anyhow::anyhow!("Invalid game state: {}", state_str)),
-    };
-
-    Ok(Game {
-        id: Uuid::parse_str(&get_string_from_row(row, "id")?)?,
-        name: get_string_from_row(row, "name")?,
-        owner_id: Uuid::parse_str(&get_string_from_row(row, "owner_id")?)?,
-        voting_system: get_string_from_row(row, "voting_system")?,
-        state,
-        current_story: get_optional_string_from_row(row, "current_story")?,
-        created_at: get_datetime_from_row(row, "created_at")?.and_utc(),
-        updated_at: get_datetime_from_row(row, "updated_at")?.and_utc(),
-    })
-}
-
-fn row_to_player(row: &Row) -> Result<Player> {
-    Ok(Player {
-        id: Uuid::parse_str(&get_string_from_row(row, "id")?)?,
-        name: get_string_from_row(row, "name")?,
-        is_observer: get_bool_from_row(row, "is_observer")?,
-        joined_at: DateTime::parse_from_rfc3339(&get_string_from_row(row, "joined_at")?)?
-            .with_timezone(&Utc),
-    })
-}
-
-fn rows_to_players(rows: &[Row]) -> Result<Vec<Player>> {
-    rows.iter().map(row_to_player).collect()
-}
-
-fn row_to_vote(row: &Row) -> Result<Vote> {
-    Ok(Vote {
-        player_id: Uuid::parse_str(&get_string_from_row(row, "player_id")?)?,
-        player_name: get_string_from_row(row, "player_name")?,
-        value: get_string_from_row(row, "value")?,
-        cast_at: DateTime::parse_from_rfc3339(&get_string_from_row(row, "cast_at")?)?
-            .with_timezone(&Utc),
-    })
-}
-
-fn rows_to_votes(rows: &[Row]) -> Result<Vec<Vote>> {
-    rows.iter().map(row_to_vote).collect()
-}
-
 #[async_trait]
 impl SessionManager for DatabaseSessionManager {
     async fn create_game(
@@ -224,7 +127,9 @@ impl SessionManager for DatabaseSessionManager {
 
         match result {
             Some(row) => {
-                let game = row_to_game(&row)?;
+                let game: Game = row
+                    .to_value_type()
+                    .map_err(|e| anyhow::anyhow!("Failed to convert row to Game: {}", e))?;
                 Ok(Some(game))
             }
             None => Ok(None),
@@ -302,7 +207,13 @@ impl SessionManager for DatabaseSessionManager {
             .execute(&**self.db)
             .await?;
 
-        let players = rows_to_players(&rows)?;
+        let players: Vec<Player> = rows
+            .iter()
+            .map(|row| {
+                row.to_value_type()
+                    .map_err(|e| anyhow::anyhow!("Failed to convert row to Player: {}", e))
+            })
+            .collect::<Result<Vec<_>>>()?;
         Ok(players)
     }
 
@@ -347,7 +258,13 @@ impl SessionManager for DatabaseSessionManager {
             .execute(&**self.db)
             .await?;
 
-        let votes = rows_to_votes(&rows)?;
+        let votes: Vec<Vote> = rows
+            .iter()
+            .map(|row| {
+                row.to_value_type()
+                    .map_err(|e| anyhow::anyhow!("Failed to convert row to Vote: {}", e))
+            })
+            .collect::<Result<Vec<_>>>()?;
         Ok(votes)
     }
 

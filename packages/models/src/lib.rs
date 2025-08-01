@@ -6,6 +6,9 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+#[cfg(feature = "database")]
+pub mod db;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Game {
     pub id: Uuid,
