@@ -537,6 +537,7 @@ pub async fn create_game_route(req: RouteRequest) -> Result<Content, RouteError>
 /// # Panics
 ///
 /// * Infallible
+#[allow(clippy::cognitive_complexity)]
 pub async fn game_page_route(req: RouteRequest) -> Result<Content, RouteError> {
     tracing::info!("game_page_route called with path: {}", req.path);
 
@@ -564,11 +565,13 @@ pub async fn game_page_route(req: RouteRequest) -> Result<Content, RouteError> {
             let players = session_manager
                 .get_game_players(game_id)
                 .await
-                .unwrap_or_default();
+                .map_err(|e| RouteError::RouteFailed(format!("Database error: {e}")))?;
+            tracing::debug!("Players: {players:?}");
             let votes = session_manager
                 .get_game_votes(game_id)
                 .await
-                .unwrap_or_default();
+                .map_err(|e| RouteError::RouteFailed(format!("Database error: {e}")))?;
+            tracing::debug!("Votes: {votes:?}");
             let game_content =
                 planning_poker_ui::game_page_with_data(game_id_str, &game, &players, &votes);
             Ok(Content::try_view(game_content).unwrap())
