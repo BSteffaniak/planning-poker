@@ -31,8 +31,8 @@ k8s_memory_request = "128Mi"
 k8s_cpu_limit = "500m"
 k8s_memory_limit = "512Mi"
 
-# SSL/TLS
-cert_manager_issuer = "letsencrypt-prod"
+# Cloudflare Configuration
+# cloudflare_api_token is read from TF_VAR_cloudflare_api_token environment variable
 
 # Auto-scaling (optional)
 enable_hpa = false

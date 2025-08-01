@@ -76,7 +76,7 @@ generate_dockerfile() {
     fi
 
     # Build the command with environment variables and serve argument
-    local cmd="~/.cargo/bin/clippier generate-dockerfile . ${package_name} --output $dockerfile_path --build-env PORT=8080 --env MAX_THREADS=64 --env ACTIX_WORKERS=32 --arg serve --no-default-features"
+    local cmd="~/.cargo/bin/clippier generate-dockerfile . ${package_name} --output $dockerfile_path --build-env PORT=80 --env MAX_THREADS=64 --env ACTIX_WORKERS=32 --arg serve --no-default-features"
     if [[ -n "$features" ]]; then
         cmd="$cmd --features=$features"
     fi

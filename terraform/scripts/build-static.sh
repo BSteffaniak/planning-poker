@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Build static assets for HyperChad
-echo "Building static assets for environment: ${ENVIRONMENT}"
+echo "Building static assets"
 
 # Navigate to project root
 cd "$(dirname "$0")/../.."
@@ -12,7 +12,7 @@ rm -rf packages/app/gen/
 
 # Build static assets using HyperChad
 echo "Running cargo build for static assets..."
-cargo run -p planning_poker_app --release --bin planning_poker_app --no-default-features --features vanilla-js,static-routes,assets,lambda gen
+cargo run -p planning_poker_app --release --bin planning_poker_app --no-default-features --features vanilla-js,static-routes,assets gen
 
 # Verify build output
 if [ ! -d "packages/app/gen" ]; then

@@ -105,27 +105,27 @@ variable "k8s_memory_limit" {
   default     = "512Mi"
 }
 
-# SSL/TLS Configuration
-variable "cert_manager_issuer" {
-  description = "Cert-manager cluster issuer name"
-  type        = string
-  default     = "letsencrypt-prod"
-}
-
-variable "letsencrypt_email" {
-  description = "Email address for Let's Encrypt certificate notifications"
-  type        = string
-  default     = "BradenSteffaniak@gmail.com"
-}
-
-variable "use_ssl" {
-  description = "Enable SSL/TLS with automatic certificate provisioning via DNS-01"
-  type        = bool
-  default     = true
-}
-
+# Cloudflare Configuration
 variable "cloudflare_api_token" {
-  description = "Cloudflare API token for DNS-01 challenges"
+  description = "Cloudflare API token for DNS management"
+  type        = string
+  sensitive   = true
+}
+
+variable "cloudflare_account_id" {
+  description = "Cloudflare Account ID for R2 and other account-level resources"
+  type        = string
+  sensitive   = true
+}
+
+variable "r2_access_key_id" {
+  description = "Cloudflare R2 Access Key ID for bucket operations"
+  type        = string
+  sensitive   = true
+}
+
+variable "r2_secret_access_key" {
+  description = "Cloudflare R2 Secret Access Key for bucket operations"
   type        = string
   sensitive   = true
 }

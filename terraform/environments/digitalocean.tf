@@ -50,7 +50,7 @@ provider "kubernetes" {
   )
 }
 
-# Helm provider for cert-manager and other charts
+# Helm provider configuration
 provider "helm" {
   kubernetes {
     host  = digitalocean_kubernetes_cluster.planning_poker.endpoint
@@ -61,19 +61,71 @@ provider "helm" {
   }
 }
 
+# Dedicated firewall for planning poker infrastructure
+resource "digitalocean_firewall" "planning_poker" {
+  name = "planning-poker-${terraform.workspace}-firewall"
+
+  # Allow inbound HTTP traffic (port 80)
+  inbound_rule {
+    protocol         = "tcp"
+    port_range       = "80"
+    source_addresses = ["0.0.0.0/0", "::/0"]
+  }
+
+  # Allow inbound HTTPS traffic (port 443) - for future use
+  inbound_rule {
+    protocol         = "tcp"
+    port_range       = "443"
+    source_addresses = ["0.0.0.0/0", "::/0"]
+  }
+
+  # Allow inbound SSH (port 22) for node management
+  inbound_rule {
+    protocol         = "tcp"
+    port_range       = "22"
+    source_addresses = ["0.0.0.0/0", "::/0"]
+  }
+
+  # Allow all outbound traffic
+  outbound_rule {
+    protocol              = "tcp"
+    port_range            = "1-65535"
+    destination_addresses = ["0.0.0.0/0", "::/0"]
+  }
+
+  outbound_rule {
+    protocol              = "udp"
+    port_range            = "1-65535"
+    destination_addresses = ["0.0.0.0/0", "::/0"]
+  }
+
+  outbound_rule {
+    protocol              = "icmp"
+    destination_addresses = ["0.0.0.0/0", "::/0"]
+  }
+
+  # Apply firewall to all nodes in the cluster
+  droplet_ids = digitalocean_kubernetes_cluster.planning_poker.node_pool[0].nodes[*].droplet_id
+
+  tags = [
+    "environment:${terraform.workspace}",
+    "project:planning-poker",
+    "managed-by:terraform"
+  ]
+}
+
 # Local values for Kubernetes
 locals {
   k8s_namespace = "planning-poker-${terraform.workspace}"
   app_name      = "planning-poker"
-  app_port      = 8080
 
   # Container image
-  container_image = "${digitalocean_container_registry.planning_poker.endpoint}/${local.app_name}:${var.image_tag}"
+  container_image = "${digitalocean_container_registry.planning_poker.endpoint}/${local.app_name}:${local.image_tag}"
 
   # Common labels
   k8s_labels = {
     app         = local.app_name
     environment = terraform.workspace
-    version     = var.image_tag
+    version     = local.image_tag
   }
 }
