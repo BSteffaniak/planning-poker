@@ -4,7 +4,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use planning_poker_database::{Database, DatabaseValue, Row};
 use planning_poker_models::{Game, GameState, Player, Session, Vote};
 use switchy::database::query::FilterableQuery;
@@ -72,6 +72,19 @@ impl DatabaseSessionManager {
 }
 
 // Database model conversion functions
+fn get_datetime_from_row(row: &Row, column: &str) -> Result<NaiveDateTime> {
+    match row.get(column) {
+        Some(DatabaseValue::DateTime(s)) => Ok(s),
+        Some(value) => Err(anyhow::anyhow!(
+            "Expected datetime for column '{}', got {:?}",
+            column,
+            value
+        )),
+        None => Err(anyhow::anyhow!("Missing column '{}'", column)),
+    }
+}
+
+// Database model conversion functions
 fn get_string_from_row(row: &Row, column: &str) -> Result<String> {
     match row.get(column) {
         Some(DatabaseValue::String(s)) => Ok(s),
@@ -96,9 +109,9 @@ fn get_optional_string_from_row(row: &Row, column: &str) -> Result<Option<String
     }
 }
 
-fn get_i64_from_row(row: &Row, column: &str) -> Result<i64> {
+fn get_bool_from_row(row: &Row, column: &str) -> Result<bool> {
     match row.get(column) {
-        Some(DatabaseValue::Number(n)) => Ok(n),
+        Some(DatabaseValue::Bool(n)) => Ok(n),
         Some(value) => Err(anyhow::anyhow!(
             "Expected number for column '{}', got {:?}",
             column,
@@ -124,10 +137,8 @@ fn row_to_game(row: &Row) -> Result<Game> {
         voting_system: get_string_from_row(row, "voting_system")?,
         state,
         current_story: get_optional_string_from_row(row, "current_story")?,
-        created_at: DateTime::parse_from_rfc3339(&get_string_from_row(row, "created_at")?)?
-            .with_timezone(&Utc),
-        updated_at: DateTime::parse_from_rfc3339(&get_string_from_row(row, "updated_at")?)?
-            .with_timezone(&Utc),
+        created_at: get_datetime_from_row(row, "created_at")?.and_utc(),
+        updated_at: get_datetime_from_row(row, "updated_at")?.and_utc(),
     })
 }
 
@@ -135,7 +146,7 @@ fn row_to_player(row: &Row) -> Result<Player> {
     Ok(Player {
         id: Uuid::parse_str(&get_string_from_row(row, "id")?)?,
         name: get_string_from_row(row, "name")?,
-        is_observer: get_i64_from_row(row, "is_observer")? != 0,
+        is_observer: get_bool_from_row(row, "is_observer")?,
         joined_at: DateTime::parse_from_rfc3339(&get_string_from_row(row, "joined_at")?)?
             .with_timezone(&Utc),
     })
@@ -181,8 +192,8 @@ impl SessionManager for DatabaseSessionManager {
             )
             .value("state", DatabaseValue::String("Waiting".to_string()))
             .value("current_story", DatabaseValue::Null)
-            .value("created_at", DatabaseValue::String(now.to_rfc3339()))
-            .value("updated_at", DatabaseValue::String(now.to_rfc3339()))
+            .value("created_at", DatabaseValue::Now)
+            .value("updated_at", DatabaseValue::Now)
             .execute(&**self.db)
             .await?;
 
@@ -245,10 +256,7 @@ impl SessionManager for DatabaseSessionManager {
                         DatabaseValue::String(story.clone())
                     }),
             )
-            .value(
-                "updated_at",
-                DatabaseValue::String(game.updated_at.to_rfc3339()),
-            )
+            .value("updated_at", DatabaseValue::Now)
             .where_eq("id", DatabaseValue::String(game.id.to_string()))
             .execute(&**self.db)
             .await?;
@@ -270,14 +278,8 @@ impl SessionManager for DatabaseSessionManager {
             .value("id", DatabaseValue::String(player.id.to_string()))
             .value("game_id", DatabaseValue::String(game_id.to_string()))
             .value("name", DatabaseValue::String(player.name))
-            .value(
-                "is_observer",
-                DatabaseValue::Number(i64::from(player.is_observer)),
-            )
-            .value(
-                "joined_at",
-                DatabaseValue::String(player.joined_at.to_rfc3339()),
-            )
+            .value("is_observer", DatabaseValue::Bool(player.is_observer))
+            .value("joined_at", DatabaseValue::Now)
             .execute(&**self.db)
             .await?;
 
@@ -328,7 +330,7 @@ impl SessionManager for DatabaseSessionManager {
             )
             .value("player_name", DatabaseValue::String(vote.player_name))
             .value("value", DatabaseValue::String(vote.value))
-            .value("cast_at", DatabaseValue::String(vote.cast_at.to_rfc3339()))
+            .value("cast_at", DatabaseValue::Now)
             .execute(&**self.db)
             .await?;
 
@@ -394,12 +396,11 @@ impl SessionManager for DatabaseSessionManager {
     async fn start_voting(&self, game_id: Uuid, story: String) -> Result<()> {
         tracing::info!("Starting voting for game {} with story: {}", game_id, story);
 
-        let now = Utc::now();
         self.db
             .update("games")
             .value("state", DatabaseValue::String("Voting".to_string()))
             .value("current_story", DatabaseValue::String(story))
-            .value("updated_at", DatabaseValue::String(now.to_rfc3339()))
+            .value("updated_at", DatabaseValue::Now)
             .where_eq("id", DatabaseValue::String(game_id.to_string()))
             .execute(&**self.db)
             .await?;
@@ -410,11 +411,10 @@ impl SessionManager for DatabaseSessionManager {
     async fn reveal_votes(&self, game_id: Uuid) -> Result<()> {
         tracing::info!("Revealing votes for game {}", game_id);
 
-        let now = Utc::now();
         self.db
             .update("games")
             .value("state", DatabaseValue::String("Revealed".to_string()))
-            .value("updated_at", DatabaseValue::String(now.to_rfc3339()))
+            .value("updated_at", DatabaseValue::Now)
             .where_eq("id", DatabaseValue::String(game_id.to_string()))
             .execute(&**self.db)
             .await?;
@@ -424,8 +424,6 @@ impl SessionManager for DatabaseSessionManager {
 
     async fn reset_voting(&self, game_id: Uuid) -> Result<()> {
         tracing::info!("Resetting voting for game {}", game_id);
-
-        let now = Utc::now();
 
         // Clear all votes for this game
         self.db
@@ -439,7 +437,7 @@ impl SessionManager for DatabaseSessionManager {
             .update("games")
             .value("state", DatabaseValue::String("Waiting".to_string()))
             .value("current_story", DatabaseValue::Null)
-            .value("updated_at", DatabaseValue::String(now.to_rfc3339()))
+            .value("updated_at", DatabaseValue::Now)
             .where_eq("id", DatabaseValue::String(game_id.to_string()))
             .execute(&**self.db)
             .await?;
