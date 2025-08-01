@@ -96,7 +96,7 @@ tracing-subscriber = "0.3.19"
 url = "2.5.4"
 uuid = { version = "1.17.0", features = ["serde", "v4"] }
 
-[patch.crates-io]
-# hyperchad = { version = "0.1.0", default-features = false, path = "../MoosicBox/packages/hyperchad" }
-# switchy = { version = "0.1.4", default-features = false, path = "../MoosicBox/packages/switchy" }
-# simvar = { version = "0.1.0", default-features = false, path = "../MoosicBox/packages/simvar" }
+# [patch.'https://github.com/MoosicBox/MoosicBox']
+# hyperchad = { path = "../MoosicBox/packages/hyperchad" }
+# simvar    = { path = "../MoosicBox/packages/simvar" }
+# switchy   = { path = "../MoosicBox/packages/switchy" }
