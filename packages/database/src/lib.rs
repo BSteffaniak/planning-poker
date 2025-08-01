@@ -128,9 +128,8 @@ pub async fn create_connection(config: DatabaseConfig) -> Result<Box<dyn Databas
             ))
         }
     } else {
-        Err(DatabaseError::Connection(format!(
-            "Unsupported database URL: {}",
-            config.database_url
-        )))
+        Err(DatabaseError::Connection(
+            "Unsupported database URL".to_string(),
+        ))
     }
 }
