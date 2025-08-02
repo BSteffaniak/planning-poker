@@ -195,7 +195,7 @@ pub fn players_section(players: &[Player]) -> Containers {
 }
 
 #[must_use]
-pub fn voting_section(game_id: &str, voting_active: bool) -> Containers {
+pub fn voting_section(game_id: &str, game: &Game, voting_active: bool) -> Containers {
     let start_voting_url = format!("/api/games/{game_id}/start-voting");
 
     container! {
@@ -216,7 +216,7 @@ pub fn voting_section(game_id: &str, voting_active: bool) -> Containers {
             // Vote buttons section
             div id="vote-buttons" margin-top=15 {
                 @if voting_active {
-                    (vote_buttons(game_id))
+                    (vote_buttons(game_id, game))
                 } @else {
                     div color="#666" {
                         "Voting not active. Click 'Start Voting' to begin."
@@ -228,8 +228,34 @@ pub fn voting_section(game_id: &str, voting_active: bool) -> Containers {
 }
 
 #[must_use]
-pub fn vote_buttons(game_id: &str) -> Containers {
-    let vote_values = ["1", "2", "3", "5", "8", "13", "?"];
+fn get_card_display(value: &str) -> Containers {
+    let display_text = match value {
+        "coffee" => "☕",
+        _ => value,
+    };
+
+    container! {
+        button
+            type="submit"
+            background="#fff"
+            color="#007bff"
+            border="1, #007bff"
+            border-radius=5
+            width="60"
+            height="90"
+            font-family="Arial, sans-serif"
+            font-size=28
+            font-weight=bold
+        {
+            (display_text)
+        }
+    }
+}
+
+#[must_use]
+pub fn vote_buttons(game_id: &str, game: &Game) -> Containers {
+    let voting_system = planning_poker_poker::VotingSystem::from_string(&game.voting_system);
+    let vote_values = voting_system.get_voting_options();
 
     container! {
         span { "Your Vote:" }
@@ -237,7 +263,7 @@ pub fn vote_buttons(game_id: &str) -> Containers {
             @for value in vote_values {
                 form hx-post=(format!("/api/games/{game_id}/vote")) {
                     input type="hidden" name="vote" value=(value);
-                    button type="submit" margin=5 padding=10 background="#6c757d" color="#fff" border="none" border-radius=5 { (value) }
+                    (get_card_display(&value))
                 }
             }
         }
@@ -423,7 +449,7 @@ pub fn game_content_with_data(
         (game_status_section(&status_text))
         (current_story_section(&game.current_story, voting_active))
         (players_section(&players))
-        (voting_section(&game_id, voting_active))
+        (voting_section(&game_id, game, voting_active))
         (results_section(&game_id, &votes, votes_revealed))
 
         div margin-top=30 {

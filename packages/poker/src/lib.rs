@@ -26,6 +26,58 @@ pub enum VotingSystem {
     Custom(Vec<String>),
 }
 
+impl VotingSystem {
+    #[must_use]
+    pub fn from_string(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "tshirt" | "t-shirt" | "tshirtsizes" => Self::TShirtSizes,
+            "powers_of_2" | "powersoftwo" | "powers_of_two" => Self::PowersOfTwo,
+            _ => Self::Fibonacci, // Default fallback (includes "fibonacci")
+        }
+    }
+
+    #[must_use]
+    pub fn get_voting_options(&self) -> Vec<String> {
+        match self {
+            Self::Fibonacci => vec![
+                "0".to_string(),
+                "1".to_string(),
+                "2".to_string(),
+                "3".to_string(),
+                "5".to_string(),
+                "8".to_string(),
+                "13".to_string(),
+                "21".to_string(),
+                "34".to_string(),
+                "55".to_string(),
+                "89".to_string(),
+                "coffee".to_string(),
+                "?".to_string(),
+            ],
+            Self::TShirtSizes => vec![
+                "XS".to_string(),
+                "S".to_string(),
+                "M".to_string(),
+                "L".to_string(),
+                "XL".to_string(),
+                "XXL".to_string(),
+                "?".to_string(),
+            ],
+            Self::PowersOfTwo => vec![
+                "1".to_string(),
+                "2".to_string(),
+                "4".to_string(),
+                "8".to_string(),
+                "16".to_string(),
+                "32".to_string(),
+                "64".to_string(),
+                "?".to_string(),
+            ],
+            Self::Custom(options) => options.clone(),
+        }
+    }
+}
+
 impl PlanningPokerGame {
     #[must_use]
     pub fn new(name: String, owner_id: Uuid, voting_system: VotingSystem) -> Self {
@@ -124,42 +176,7 @@ impl PlanningPokerGame {
 
     #[must_use]
     pub fn get_voting_options(&self) -> Vec<String> {
-        match &self.voting_system {
-            VotingSystem::Fibonacci => vec![
-                "0".to_string(),
-                "1".to_string(),
-                "2".to_string(),
-                "3".to_string(),
-                "5".to_string(),
-                "8".to_string(),
-                "13".to_string(),
-                "21".to_string(),
-                "34".to_string(),
-                "55".to_string(),
-                "89".to_string(),
-                "?".to_string(),
-            ],
-            VotingSystem::TShirtSizes => vec![
-                "XS".to_string(),
-                "S".to_string(),
-                "M".to_string(),
-                "L".to_string(),
-                "XL".to_string(),
-                "XXL".to_string(),
-                "?".to_string(),
-            ],
-            VotingSystem::PowersOfTwo => vec![
-                "1".to_string(),
-                "2".to_string(),
-                "4".to_string(),
-                "8".to_string(),
-                "16".to_string(),
-                "32".to_string(),
-                "64".to_string(),
-                "?".to_string(),
-            ],
-            VotingSystem::Custom(options) => options.clone(),
-        }
+        self.voting_system.get_voting_options()
     }
 
     #[must_use]
