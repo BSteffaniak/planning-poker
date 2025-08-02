@@ -51,7 +51,7 @@ impl VotingSystem {
                 "34".to_string(),
                 "55".to_string(),
                 "89".to_string(),
-                "coffee".to_string(),
+                "☕".to_string(),
                 "?".to_string(),
             ],
             Self::TShirtSizes => vec![

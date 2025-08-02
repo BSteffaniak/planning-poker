@@ -229,11 +229,6 @@ pub fn voting_section(game_id: &str, game: &Game, voting_active: bool) -> Contai
 
 #[must_use]
 fn get_card_display(value: &str) -> Containers {
-    let display_text = match value {
-        "coffee" => "☕",
-        _ => value,
-    };
-
     container! {
         button
             type="submit"
@@ -247,7 +242,7 @@ fn get_card_display(value: &str) -> Containers {
             font-size=28
             font-weight=bold
         {
-            (display_text)
+            (value)
         }
     }
 }
