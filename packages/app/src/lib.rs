@@ -182,14 +182,18 @@ async fn update_vote_buttons(game_id: &str, voting_active: bool) {
     send_partial_update("vote-buttons", content).await;
 }
 
-async fn update_entire_voting_section(game_id: &str, voting_active: bool) {
+async fn update_entire_voting_section(
+    game_id: &str,
+    game: &planning_poker_models::Game,
+    voting_active: bool,
+) {
     tracing::info!(
         "VOTING SECTION: Updating entire voting section for game {}, voting_active: {}",
         game_id,
         voting_active
     );
 
-    let content = planning_poker_ui::voting_section(game_id, voting_active);
+    let content = planning_poker_ui::voting_section(game_id, game, voting_active);
     send_partial_update("voting-section", content).await;
 }
 
@@ -883,7 +887,7 @@ pub async fn reveal_votes_route(req: RouteRequest) -> Result<Content, RouteError
 
                 // Update voting section to reflect revealed state
                 let voting_active = matches!(game.state, GameState::Voting);
-                update_entire_voting_section(game_id_str, voting_active).await;
+                update_entire_voting_section(game_id_str, &game, voting_active).await;
             }
 
             if let Ok(votes) = session_manager.get_game_votes(game_id).await {
@@ -982,7 +986,7 @@ pub async fn start_voting_route(req: RouteRequest) -> Result<Content, RouteError
                 tracing::info!("START VOTING: Calculated voting_active: {}", voting_active);
 
                 // Update the entire voting section to avoid partial update conflicts
-                update_entire_voting_section(game_id_str, voting_active).await;
+                update_entire_voting_section(game_id_str, &game, voting_active).await;
 
                 // Update story display and input
                 update_current_story(game.current_story.as_ref(), voting_active).await;

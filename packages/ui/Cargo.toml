@@ -22,6 +22,7 @@ hyperchad = { workspace = true, features = [
     "transformer",
 ] }
 planning_poker_models = { workspace = true }
+planning_poker_poker = { workspace = true }
 serde = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true }
