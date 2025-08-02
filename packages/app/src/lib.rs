@@ -113,6 +113,11 @@ pub struct VoteForm {
     pub vote: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct StartVotingForm {
+    pub story: String,
+}
+
 // SSE Partial Update Helper Functions
 #[allow(clippy::cognitive_complexity)]
 async fn send_partial_update(target: &str, content: Containers) {
@@ -188,9 +193,15 @@ async fn update_entire_voting_section(game_id: &str, voting_active: bool) {
     send_partial_update("voting-section", content).await;
 }
 
-async fn update_story_input(game_id: &str, voting_active: bool) {
-    let content = planning_poker_ui::story_input_content(game_id, voting_active);
+async fn update_story_input(game_id: &str, voting_active: bool, current_story: Option<&String>) {
+    let content =
+        planning_poker_ui::story_input_content(game_id, voting_active, &current_story.cloned());
     send_partial_update("story-input", content).await;
+}
+
+async fn update_current_story(current_story: Option<&String>, voting_active: bool) {
+    let content = planning_poker_ui::current_story_section(&current_story.cloned(), voting_active);
+    send_partial_update("current-story", content).await;
 }
 
 #[allow(clippy::cognitive_complexity)]
@@ -935,9 +946,16 @@ pub async fn start_voting_route(req: RouteRequest) -> Result<Content, RouteError
         );
     }
 
-    // TODO: Parse story from request body if needed
-    // For now, use a default story
-    let story = "Current Story".to_string();
+    // Parse story from form data
+    let form_data = req.parse_form::<StartVotingForm>()?;
+    let story = form_data.story.trim().to_string();
+
+    // Use default if story is empty
+    let story = if story.is_empty() {
+        "Untitled Story".to_string()
+    } else {
+        story
+    };
 
     match session_manager.start_voting(game_id, story).await {
         Ok(()) => {
@@ -965,6 +983,10 @@ pub async fn start_voting_route(req: RouteRequest) -> Result<Content, RouteError
 
                 // Update the entire voting section to avoid partial update conflicts
                 update_entire_voting_section(game_id_str, voting_active).await;
+
+                // Update story display and input
+                update_current_story(game.current_story.as_ref(), voting_active).await;
+                update_story_input(game_id_str, voting_active, game.current_story.as_ref()).await;
             } else {
                 tracing::error!("START VOTING: Failed to get game after start_voting call");
             }
@@ -1042,7 +1064,8 @@ pub async fn reset_voting_route(req: RouteRequest) -> Result<Content, RouteError
 
                 let voting_active = matches!(game.state, GameState::Voting);
                 update_vote_buttons(game_id_str, voting_active).await;
-                update_story_input(game_id_str, voting_active).await;
+                update_story_input(game_id_str, voting_active, game.current_story.as_ref()).await;
+                update_current_story(game.current_story.as_ref(), voting_active).await;
                 update_game_actions(game_id_str, game.state).await;
             }
 

@@ -204,10 +204,12 @@ pub fn voting_section(game_id: &str, voting_active: bool) -> Containers {
 
             // Story input section
             div id="story-input" margin-bottom=15 {
-                span { "Story:" }
-                input type="text" placeholder="Enter story to vote on" margin-left=10;
-                button hx-post=(start_voting_url) margin-left=10 padding=5 background="#007bff" color="#fff" border="none" border-radius=3 {
-                    "Start Voting"
+                form hx-post=(start_voting_url) {
+                    span { "Story:" }
+                    input type="text" name="story" placeholder="Enter story to vote on" margin-left=10 required;
+                    button type="submit" margin-left=10 padding=5 background="#007bff" color="#fff" border="none" border-radius=3 {
+                        "Start Voting"
+                    }
                 }
             }
 
@@ -338,23 +340,49 @@ pub fn game_status_content(status: &str) -> Containers {
 }
 
 #[must_use]
-pub fn story_input_content(game_id: &str, voting_active: bool) -> Containers {
+pub fn current_story_section(current_story: &Option<String>, voting_active: bool) -> Containers {
+    container! {
+        div id="current-story" margin-bottom=15 {
+            @if let Some(story) = current_story {
+                h3 { "Current Story" }
+                div padding=15 background="#e3f2fd" border-left="4px solid #2196f3" border-radius=5 margin-bottom=10 {
+                    (story)
+                }
+            } @else if voting_active {
+                div color="#666" padding=10 background="#f8f9fa" border-radius=5 {
+                    "No story specified"
+                }
+            }
+        }
+    }
+}
+
+#[must_use]
+pub fn story_input_content(
+    game_id: &str,
+    voting_active: bool,
+    current_story: &Option<String>,
+) -> Containers {
     let start_voting_url = format!("/api/games/{game_id}/start-voting");
 
     if voting_active {
         container! {
-            span { "Story:" }
-            input type="text" placeholder="Enter story to vote on" margin-left=10;
-            button hx-post=(start_voting_url) margin-left=10 padding=5 background="#007bff" color="#fff" border="none" border-radius=3 disabled {
-                "Voting Active"
+            form hx-post=(start_voting_url) {
+                span { "Story:" }
+                input type="text" name="story" value=(current_story.as_deref().unwrap_or("")) margin-left=10 readonly;
+                button type="submit" margin-left=10 padding=5 background="#6c757d" color="#fff" border="none" border-radius=3 disabled {
+                    "Voting Active"
+                }
             }
         }
     } else {
         container! {
-            span { "Story:" }
-            input type="text" placeholder="Enter story to vote on" margin-left=10;
-            button hx-post=(start_voting_url) margin-left=10 padding=5 background="#007bff" color="#fff" border="none" border-radius=3 {
-                "Start Voting"
+            form hx-post=(start_voting_url) {
+                span { "Story:" }
+                input type="text" name="story" placeholder="Enter story to vote on" margin-left=10 required;
+                button type="submit" margin-left=10 padding=5 background="#007bff" color="#fff" border="none" border-radius=3 {
+                    "Start Voting"
+                }
             }
         }
     }
@@ -393,6 +421,7 @@ pub fn game_content_with_data(
         div { (format!("Game: {}", game.name)) }
 
         (game_status_section(&status_text))
+        (current_story_section(&game.current_story, voting_active))
         (players_section(&players))
         (voting_section(&game_id, voting_active))
         (results_section(&game_id, &votes, votes_revealed))
