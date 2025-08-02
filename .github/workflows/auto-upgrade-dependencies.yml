@@ -186,7 +186,7 @@ jobs:
         name: Test compatible upgrades
         runs-on: ${{ matrix.package.os }}
         needs: [upgrade-compatible, validate-compatible]
-        if: ${{ needs.upgrade-compatible.outputs.upgraded == 'true' && fromJson(needs.validate-compatible.outputs.matrix) != '[]' }}
+        if: ${{ needs.upgrade-compatible.outputs.upgraded == 'true' && needs.validate-compatible.outputs.matrix != '[]' }}
         strategy:
             fail-fast: false
             matrix:
@@ -497,7 +497,7 @@ jobs:
         name: Test incompatible upgrades
         runs-on: ${{ matrix.package.os }}
         needs: [upgrade-compatible, upgrade-incompatible, validate-incompatible]
-        if: ${{ needs.upgrade-incompatible.outputs.upgraded == 'true' && fromJson(needs.validate-incompatible.outputs.matrix) != '[]' }}
+        if: ${{ needs.upgrade-incompatible.outputs.upgraded == 'true' && needs.validate-incompatible.outputs.matrix != '[]' }}
         strategy:
             fail-fast: false
             matrix:
