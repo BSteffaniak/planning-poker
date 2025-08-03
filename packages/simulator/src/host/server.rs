@@ -8,12 +8,12 @@ pub fn start(sim: &mut impl Sim) {
     let addr = format!("{host}:{PORT}");
 
     sim.host(HOST, move || {
-        let _addr = addr.clone();
+        let addr = addr.clone();
         async move {
             log::debug!("starting Planning Poker server simulation");
 
             // Run the server simulation
-            run_until_simulation_cancelled(run_server_simulation())
+            run_until_simulation_cancelled(run_server_simulation(&addr))
                 .await
                 .transpose()
                 .map_err(|x| {
@@ -27,7 +27,7 @@ pub fn start(sim: &mut impl Sim) {
     });
 }
 
-async fn run_server_simulation() -> Result<(), crate::Error> {
+async fn run_server_simulation(_addr: &str) -> Result<(), crate::Error> {
     use planning_poker_database::{create_connection, DatabaseConfig};
     use planning_poker_session::{DatabaseSessionManager, SessionManager};
     use simvar::switchy::unsync::time::sleep;
