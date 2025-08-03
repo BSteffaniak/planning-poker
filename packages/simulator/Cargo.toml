@@ -12,7 +12,7 @@ version     = "0.1.0"
 
 [dependencies]
 # Internal Planning Poker packages
-planning_poker_database = { workspace = true }
+planning_poker_database = { workspace = true, features = ["simulator"] }
 planning_poker_session  = { workspace = true }
 
 # Simvar for deterministic simulation

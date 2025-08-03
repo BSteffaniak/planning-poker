@@ -22,4 +22,6 @@ default  = ["sqlite"]
 postgres = ["dep:url", "switchy/database-connection-postgres-sqlx"]
 sqlite   = ["switchy/database-connection-sqlite-rusqlite"]
 
+simulator = ["sqlite", "switchy/database-connection-simulator"]
+
 fail-on-warnings = []
