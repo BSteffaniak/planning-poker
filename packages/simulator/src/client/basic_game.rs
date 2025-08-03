@@ -155,17 +155,12 @@ async fn make_http_request(
         content_type.map_or(String::new(), |ct| format!("Content-Type: {ct}\r\n"));
 
     let request = format!(
-        "{} {} HTTP/1.1\r\n\
-         Host: {}\r\n\
-         {}Content-Length: {}\r\n\
+        "{method} {path} HTTP/1.1\r\n\
+         Host: {server_addr}\r\n\
+         {content_type_header}Content-Length: {content_length}\r\n\
          Connection: close\r\n\
-         \r\n{}",
-        method,
-        path,
-        server_addr,
-        content_type_header,
-        content_length,
-        body.unwrap_or("")
+         \r\n{body}",
+        body = body.unwrap_or("")
     );
 
     connection
