@@ -79,25 +79,25 @@ simvar = { version = "0.1.0", default-features = false, git = "https://github.co
 # MoosicBox JSON utilities for database mapping
 moosicbox_json_utils = { version = "0.1.4", default-features = false, git = "https://github.com/MoosicBox/MoosicBox" }
 
-anyhow = "1.0.98"
+anyhow = "1.0.99"
 async-trait = "0.1.88"
 bytes = "1.10.1"
 chrono = { version = "0.4.41", default-features = false, features = [
     "clock",
     "serde",
 ] }
-clap = { version = "4.5.42", features = ["derive"] }
+clap = { version = "4.5.45", features = ["derive"] }
 include_dir = "0.7.4"
 log = { version = "0.4.27", features = ["release_max_level_trace"] }
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.142"
-thiserror = "2.0.12"
+thiserror = "2.0.14"
 tokio = { version = "1.47.1" }
 toml = "0.9.5"
 tracing = "0.1.41"
 tracing-subscriber = "0.3.19"
 url = "2.5.4"
-uuid = { version = "1.17.0", features = ["serde", "v4"] }
+uuid = { version = "1.18.0", features = ["serde", "v4"] }
 
 # [patch.'https://github.com/MoosicBox/MoosicBox']
 # hyperchad            = { path = "../MoosicBox/packages/hyperchad" }
